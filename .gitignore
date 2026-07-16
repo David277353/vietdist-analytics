@@ -1,0 +1,22 @@
+# Environment / secrets — never commit
+.env
+credentials/
+*.json
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Power BI (large binary; optional to track — remove this line if you want it in Git)
+*.pbix
+
+# Large raw data — don't commit source data files
+Raw Data/

@@ -1,0 +1,11 @@
+pandas
+openpyxl
+xlrd
+pyxlsb
+sqlalchemy
+psycopg2-binary
+gspread
+google-auth
+msal
+requests
+python-dotenv

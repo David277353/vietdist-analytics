@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VietDist Sales Analytics — 2024</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1"></script>
+<style>
+:root{
+  --bg-primary:#f8f9fa;--bg-card:#fff;--bg-header:#1a1a2e;
+  --text-primary:#212529;--text-secondary:#6c757d;--text-on-dark:#fff;
+  --c1:#4C72B0;--c2:#DD8452;--c3:#55A868;--c4:#C44E52;--c5:#8172B3;--c6:#937860;
+  --positive:#28a745;--negative:#dc3545;--gap:16px;--radius:8px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg-primary);color:var(--text-primary);line-height:1.5}
+.dash{max-width:1400px;margin:0 auto;padding:var(--gap)}
+.hdr{background:var(--bg-header);color:var(--text-on-dark);padding:18px 24px;border-radius:var(--radius);margin-bottom:var(--gap);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.hdr h1{font-size:20px;font-weight:600}
+.hdr .sub{font-size:12px;color:rgba(255,255,255,.6)}
+.filters{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.fg{display:flex;align-items:center;gap:6px}
+.fg label{font-size:12px;color:rgba(255,255,255,.7)}
+.fg select{padding:6px 10px;border:1px solid rgba(255,255,255,.2);border-radius:4px;background:rgba(255,255,255,.1);color:#fff;font-size:13px}
+.fg select option{background:var(--bg-header);color:#fff}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--gap);margin-bottom:var(--gap)}
+.kpi{background:var(--bg-card);border-radius:var(--radius);padding:18px 22px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.kpi .lbl{font-size:12px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.kpi .val{font-size:26px;font-weight:700}
+.kpi .note{font-size:12px;color:var(--text-secondary)}
+.row{display:grid;gap:var(--gap);margin-bottom:var(--gap)}
+.row.two{grid-template-columns:3fr 2fr}
+.row.three{grid-template-columns:1fr 1fr 1fr}
+.card{background:var(--bg-card);border-radius:var(--radius);padding:18px 22px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.card h3{font-size:14px;font-weight:600;margin-bottom:12px}
+.card .ch{position:relative;height:280px}
+.card .ch.sm{height:230px}
+.tbl-wrap{overflow-x:auto;max-height:420px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{position:sticky;top:0;background:var(--bg-card);text-align:left;padding:8px 10px;border-bottom:2px solid #dee2e6;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;cursor:pointer;user-select:none}
+thead th:hover{color:var(--text-primary)}
+tbody td{padding:7px 10px;border-bottom:1px solid #f0f0f0;white-space:nowrap}
+tbody tr:hover{background:#f8f9fa}
+td.num,th.num{text-align:right}
+.pill{display:inline-block;min-width:56px;text-align:center;padding:2px 8px;border-radius:10px;font-weight:600;font-size:12px;color:#fff}
+.p-red{background:#dc3545}.p-org{background:#fd7e14}.p-yel{background:#d4a017}.p-grn{background:#28a745}
+.ftr{text-align:center;font-size:12px;color:var(--text-secondary);padding:8px 0 20px}
+@media(max-width:900px){.row.two,.row.three{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="dash">
+  <header class="hdr">
+    <div>
+      <h1>VietDist — Sales Analytics 2024</h1>
+      <div class="sub">Nguồn: dwh (PostgreSQL) · fact_sales 119,101 dòng · cập nhật 2026-07-12</div>
+    </div>
+    <div class="filters">
+      <div class="fg"><label>Miền</label><select id="f-region" onchange="D.apply()"><option value="all">Tất cả</option></select></div>
+      <div class="fg"><label>Kênh</label><select id="f-channel" onchange="D.apply()"><option value="all">Tất cả</option></select></div>
+    </div>
+  </header>
+
+  <section class="kpis">
+    <div class="kpi"><div class="lbl">Doanh thu thuần</div><div class="val" id="k-sales">–</div><div class="note" id="k-sales-n"></div></div>
+    <div class="kpi"><div class="lbl">Số đơn hàng</div><div class="val" id="k-orders">–</div><div class="note" id="k-aov"></div></div>
+    <div class="kpi"><div class="lbl">Đạt mục tiêu (toàn cty)</div><div class="val" id="k-ach">–</div><div class="note">actual / target 2024</div></div>
+    <div class="kpi"><div class="lbl">Tỷ lệ hàng trả (toàn cty)</div><div class="val" id="k-ret">–</div><div class="note" id="k-ret-n"></div></div>
+  </section>
+
+  <section class="row two">
+    <div class="card"><h3>Doanh thu theo tháng <span id="t-trend" style="color:var(--text-secondary);font-weight:400"></span></h3><div class="ch"><canvas id="c-trend"></canvas></div></div>
+    <div class="card"><h3>Thực tế vs Mục tiêu theo tháng (toàn công ty)</h3><div class="ch"><canvas id="c-target"></canvas></div></div>
+  </section>
+
+  <section class="row three">
+    <div class="card"><h3>Cơ cấu theo kênh</h3><div class="ch sm"><canvas id="c-channel"></canvas></div></div>
+    <div class="card"><h3>Doanh thu theo miền</h3><div class="ch sm"><canvas id="c-region"></canvas></div></div>
+    <div class="card"><h3>Cơ cấu theo ngành hàng (toàn cty)</h3><div class="ch sm"><canvas id="c-cat"></canvas></div></div>
+  </section>
+
+  <section class="row two">
+    <div class="card"><h3>Top 10 sản phẩm theo doanh thu (toàn cty)</h3><div class="ch"><canvas id="c-prod"></canvas></div></div>
+    <div class="card"><h3>Hàng trả theo lý do (toàn cty)</h3><div class="ch"><canvas id="c-reason"></canvas></div></div>
+  </section>
+
+  <section class="row" style="grid-template-columns:1fr">
+    <div class="card">
+      <h3>Hiệu suất nhân viên vs mục tiêu 2024 <span style="font-weight:400;color:var(--text-secondary)">(lọc theo Miền; bấm tiêu đề cột để sắp xếp)</span></h3>
+      <div class="tbl-wrap"><div id="t-emp"></div></div>
+    </div>
+  </section>
+
+  <section class="row" style="grid-template-columns:1fr">
+    <div class="card">
+      <h3>Hiệu suất nhà phân phối <span style="font-weight:400;color:var(--text-secondary)">(125 NPP có đơn hàng · bấm tiêu đề cột để sắp xếp)</span></h3>
+      <div class="tbl-wrap"><div id="t-dist"></div></div>
+    </div>
+  </section>
+
+  <footer class="ftr">VietDist Analytics · dữ liệu tổng hợp từ Data Warehouse (bronze → silver → gold) · dashboard tĩnh, mở offline được</footer>
+</div>
+
+<script>
+// ===== EMBEDDED DATA (pre-aggregated from dwh via DAX, 2024) =====
+// [month, region, channel, sales, orders, qty]
+const MONTHLY=[
+[1,"Miền Nam","Modern Trade",2248901300,678,103359],[2,"Miền Nam","Modern Trade",1093381200,353,52676],[3,"Miền Nam","Modern Trade",1422823900,428,66823],[4,"Miền Nam","Modern Trade",1288694700,397,59229],[5,"Miền Nam","Modern Trade",1520839200,474,69754],[6,"Miền Nam","Modern Trade",1491294700,474,70170],[7,"Miền Nam","Modern Trade",1183535600,368,55026],[8,"Miền Nam","Modern Trade",1510603400,481,71652],[9,"Miền Nam","Modern Trade",1591906800,495,73891],[10,"Miền Nam","Modern Trade",1302900400,410,60707],[11,"Miền Nam","Modern Trade",1355967200,444,66281],[12,"Miền Nam","Modern Trade",1856622300,598,86960],
+[1,"Miền Trung","Modern Trade",2997167300,957,143837],[2,"Miền Trung","Modern Trade",1342832700,442,63051],[3,"Miền Trung","Modern Trade",1939571800,615,92850],[4,"Miền Trung","Modern Trade",1796364800,548,82594],[5,"Miền Trung","Modern Trade",2042960900,651,96458],[6,"Miền Trung","Modern Trade",2109060500,671,100409],[7,"Miền Trung","Modern Trade",1627052800,547,78722],[8,"Miền Trung","Modern Trade",2108954000,640,99943],[9,"Miền Trung","Modern Trade",2292908900,704,105255],[10,"Miền Trung","Modern Trade",1604011600,509,76279],[11,"Miền Trung","Modern Trade",2008340900,634,96336],[12,"Miền Trung","Modern Trade",2769912000,868,131928],
+[1,"Miền Bắc","Modern Trade",2302219200,707,107772],[2,"Miền Bắc","Modern Trade",1095688900,340,52409],[3,"Miền Bắc","Modern Trade",1729595700,557,80161],[4,"Miền Bắc","Modern Trade",1231283000,375,56774],[5,"Miền Bắc","Modern Trade",1464139100,452,68298],[6,"Miền Bắc","Modern Trade",1761536200,541,83831],[7,"Miền Bắc","Modern Trade",1275751500,430,60762],[8,"Miền Bắc","Modern Trade",1429538500,439,66723],[9,"Miền Bắc","Modern Trade",1633593600,514,75700],[10,"Miền Bắc","Modern Trade",1300354900,398,60729],[11,"Miền Bắc","Modern Trade",1703698500,516,78827],[12,"Miền Bắc","Modern Trade",1857763500,631,89628],
+[1,"Miền Nam","Traditional Trade",3430833900,1035,157670],[2,"Miền Nam","Traditional Trade",1532939100,496,71733],[3,"Miền Nam","Traditional Trade",2172221100,705,101125],[4,"Miền Nam","Traditional Trade",1995661300,620,97505],[5,"Miền Nam","Traditional Trade",2165265400,667,99121],[6,"Miền Nam","Traditional Trade",2305741400,714,108713],[7,"Miền Nam","Traditional Trade",2088170200,632,98276],[8,"Miền Nam","Traditional Trade",2227182100,711,105658],[9,"Miền Nam","Traditional Trade",2291507700,744,109173],[10,"Miền Nam","Traditional Trade",1702419900,547,80813],[11,"Miền Nam","Traditional Trade",2049344500,635,92283],[12,"Miền Nam","Traditional Trade",2870598800,907,136690],
+[1,"Miền Trung","Traditional Trade",2666982400,819,120793],[2,"Miền Trung","Traditional Trade",1202673900,390,56850],[3,"Miền Trung","Traditional Trade",1689658900,557,80333],[4,"Miền Trung","Traditional Trade",1571036100,491,72998],[5,"Miền Trung","Traditional Trade",1666269400,514,77519],[6,"Miền Trung","Traditional Trade",2051859600,639,97287],[7,"Miền Trung","Traditional Trade",1507510900,460,68005],[8,"Miền Trung","Traditional Trade",2020435800,583,92869],[9,"Miền Trung","Traditional Trade",2091079000,668,97984],[10,"Miền Trung","Traditional Trade",1336410900,453,63556],[11,"Miền Trung","Traditional Trade",1840147100,547,86217],[12,"Miền Trung","Traditional Trade",2435089100,735,112830],
+[1,"Miền Bắc","Traditional Trade",3054959200,949,141638],[2,"Miền Bắc","Traditional Trade",1404661100,450,66397],[3,"Miền Bắc","Traditional Trade",2001829200,612,93849],[4,"Miền Bắc","Traditional Trade",1749664400,542,82090],[5,"Miền Bắc","Traditional Trade",2124167000,632,96467],[6,"Miền Bắc","Traditional Trade",2290361800,715,106336],[7,"Miền Bắc","Traditional Trade",1773713500,566,83273],[8,"Miền Bắc","Traditional Trade",1816468700,607,87139],[9,"Miền Bắc","Traditional Trade",2172790500,692,101376],[10,"Miền Bắc","Traditional Trade",1771581500,592,85577],[11,"Miền Bắc","Traditional Trade",1941891500,606,91072],[12,"Miền Bắc","Traditional Trade",2858841900,884,132179],
+[1,"Miền Nam","E-commerce",826396100,241,37202],[2,"Miền Nam","E-commerce",396885100,133,19626],[3,"Miền Nam","E-commerce",468083900,159,21628],[4,"Miền Nam","E-commerce",381604000,133,18860],[5,"Miền Nam","E-commerce",462297000,153,22326],[6,"Miền Nam","E-commerce",560313800,194,27257],[7,"Miền Nam","E-commerce",316444500,106,14736],[8,"Miền Nam","E-commerce",526356100,178,25029],[9,"Miền Nam","E-commerce",652021700,194,30019],[10,"Miền Nam","E-commerce",391205600,126,18118],[11,"Miền Nam","E-commerce",470568500,153,21885],[12,"Miền Nam","E-commerce",730052200,219,33792],
+[1,"Miền Trung","E-commerce",1362609900,424,63370],[2,"Miền Trung","E-commerce",675894300,220,32415],[3,"Miền Trung","E-commerce",852719600,278,41046],[4,"Miền Trung","E-commerce",838724900,264,39529],[5,"Miền Trung","E-commerce",791404400,282,38905],[6,"Miền Trung","E-commerce",1038232700,343,48178],[7,"Miền Trung","E-commerce",798949900,250,37301],[8,"Miền Trung","E-commerce",795805400,252,36628],[9,"Miền Trung","E-commerce",1027877800,340,49732],[10,"Miền Trung","E-commerce",855534500,272,40802],[11,"Miền Trung","E-commerce",938037600,301,42635],[12,"Miền Trung","E-commerce",1238605200,408,57397],
+[1,"Miền Bắc","E-commerce",822171100,221,37048],[2,"Miền Bắc","E-commerce",396054500,120,19357],[3,"Miền Bắc","E-commerce",408304200,139,20290],[4,"Miền Bắc","E-commerce",532065900,165,25257],[5,"Miền Bắc","E-commerce",518181900,160,24757],[6,"Miền Bắc","E-commerce",551372700,181,25573],[7,"Miền Bắc","E-commerce",387917100,131,19656],[8,"Miền Bắc","E-commerce",493385700,156,22792],[9,"Miền Bắc","E-commerce",635130100,199,28207],[10,"Miền Bắc","E-commerce",433452300,123,18538],[11,"Miền Bắc","E-commerce",458544600,152,21110],[12,"Miền Bắc","E-commerce",760618100,228,34877]];
+// [month, actual, target]
+const TARGET=[[1,19712240400,30812700000],[2,9141010800,15272900000],[3,12684808300,20541900000],[4,11385099100,17974600000],[5,12755524300,20541900000],[6,14159773400,23109400000],[7,10959046000,17189500000],[8,12928729700,19672000000],[9,14388816100,22099300000],[10,10697871600,17297000000],[11,12766540400,19614700000],[12,17378103100,27260600000]];
+// [month, return_amount, return_qty]
+const RETURNS=[[1,88759000,3768],[2,111678500,5186],[3,83524000,4082],[4,115363000,4987],[5,91324500,3992],[6,112270500,4754],[7,97140500,4470],[8,91573500,3982],[9,96983500,4398],[10,107830500,4681],[11,102059000,4683],[12,210464500,9461]];
+const REASONS=[["Khách từ chối nhận",232497500],["Hàng hết hạn",220268500],["Sai sản phẩm",219996500],["Hàng vỡ vận chuyển",218867000],["Không đúng đơn hàng",213447500],["Hàng lỗi",203894000]];
+const CATEGORY=[["Thức uống",59636332000],["Thực phẩm",43262282800],["Gia dụng",28206419300],["Chăm sóc cá nhân",27852529100]];
+const TOP_PRODUCTS=[["Nước uống đóng chai Loại B","Thức uống",3991476500],["Nước rửa chén Premium","Gia dụng",3966629000],["Nước uống đóng chai Premium","Thức uống",3786333000],["Gia vị Premium","Thực phẩm",3742223000],["Nước tăng lực Loại B","Thức uống",3234564800],["Cháo ăn liền Standard","Thực phẩm",3221426400],["Dầu gội Premium","Chăm sóc cá nhân",3165613200],["Nước lau sàn Standard","Gia dụng",3127354000],["Nước tăng lực Standard","Thức uống",3057170400],["Sữa Loại B","Thức uống",2946978800]];
+// [id, name, region, team, actual, target]
+const EMPLOYEES=[
+["EMP1002","Ngô Thị Hà","Miền Bắc","Team Bắc 1",1237148400,2258800000],["EMP1003","Phạm Bá Bình","Miền Bắc","Team Bắc 1",919027100,2861200000],["EMP1004","Đỗ Minh An","Miền Bắc","Team Bắc 1",1432375800,2974000000],["EMP1005","Phạm Quốc Hùng","Miền Bắc","Team Bắc 1",1497689100,2728000000],["EMP1006","Đỗ Minh Cường","Miền Bắc","Team Bắc 1",2327418700,2458800000],["EMP1007","Bùi Minh Hải","Miền Bắc","Team Bắc 1",2154664700,2432900000],["EMP1008","Trần Thanh Hùng","Miền Bắc","Team Bắc 1",2108469900,2986000000],["EMP1009","Huỳnh Quốc Ngân","Miền Bắc","Team Bắc 1",1822547300,2405100000],["EMP1010","Đặng Xuân Thắng","Miền Bắc","Team Bắc 1",1726695900,2325100000],["EMP1011","Dương Quốc Lộc","Miền Bắc","Team Bắc 1",1435678800,2912000000],
+["EMP1013","Phạm Hồng Tâm","Miền Bắc","Team Bắc 2",1430929900,2242000000],["EMP1014","Lê Bá Vân","Miền Bắc","Team Bắc 2",2053345300,2742000000],["EMP1015","Lê Thành Phương","Miền Bắc","Team Bắc 2",3120951800,3037100000],["EMP1016","Hoàng Bá An","Miền Bắc","Team Bắc 2",1636108000,2840000000],["EMP1017","Hoàng Xuân Long","Miền Bắc","Team Bắc 2",2179365300,2948000000],["EMP1018","Trần Thành Tuấn","Miền Bắc","Team Bắc 2",1645928800,2525100000],["EMP1019","Dương Bá An","Miền Bắc","Team Bắc 2",1342900600,3140000000],["EMP1020","Lý Minh Quân","Miền Bắc","Team Bắc 2",899484400,2941200000],["EMP1021","Lý Thị Lan","Miền Bắc","Team Bắc 2",1773252200,2772000000],["EMP1022","Lý Công Phương","Miền Bắc","Team Bắc 2",2492803200,2378000000],
+["EMP1024","Phạm Thanh Giang","Miền Bắc","Team Bắc 3",812953300,2901200000],["EMP1025","Trần Hồng Dũng","Miền Bắc","Team Bắc 3",1179848400,2672900000],["EMP1026","Bùi Thanh Thắng","Miền Bắc","Team Bắc 3",1327058400,2665100000],["EMP1027","Dương Hữu Nhân","Miền Bắc","Team Bắc 3",1223650900,2845100000],["EMP1028","Vũ Xuân Thảo","Miền Bắc","Team Bắc 3",940197400,2742900000],["EMP1029","Dương Thị Quân","Miền Bắc","Team Bắc 3",1245433300,2878000000],["EMP1030","Lê Minh Thảo","Miền Bắc","Team Bắc 3",3936457400,2828800000],["EMP1031","Hồ Bá An","Miền Bắc","Team Bắc 3",1911148200,3030000000],["EMP1032","Đặng Thanh Lộc","Miền Bắc","Team Bắc 3",1148922900,2751200000],["EMP1033","Hoàng Hữu Tiến","Miền Bắc","Team Bắc 3",1506969400,3131200000],
+["EMP1034","Hoàng Thanh Dũng","Miền Trung","Team Trung 1",239875500,1462000000],["EMP1035","Đỗ Hữu Long","Miền Trung","Team Trung 1",1324439100,1333500000],["EMP1036","Đỗ Thị Quân","Miền Trung","Team Trung 1",2963877700,2902900000],["EMP1037","Trần Xuân Uyên","Miền Trung","Team Trung 1",2327413100,2692900000],["EMP1038","Vũ Đức Tuấn","Miền Trung","Team Trung 1",3743631200,3498000000],["EMP1039","Đỗ Công Hùng","Miền Trung","Team Trung 1",5833778300,2618000000],["EMP1040","Huỳnh Thị Quân","Miền Trung","Team Trung 1",6042938800,3270000000],["EMP1041","Ngô Minh An","Miền Trung","Team Trung 1",12782219800,3181200000],["EMP1042","Trần Hồng Linh","Miền Trung","Team Trung 1",3959329400,3487100000],
+["EMP1043","Hồ Thành Tâm","Miền Trung","Team Trung 2",230684300,1394400000],["EMP1044","Hồ Xuân Thắng","Miền Trung","Team Trung 2",5099251100,3530000000],["EMP1045","Hoàng Đức Sơn","Miền Trung","Team Trung 2",2163438600,2961200000],["EMP1046","Ngô Đức Cường","Miền Trung","Team Trung 2",1035393800,1707600000],["EMP1047","Nguyễn Minh Hải","Miền Trung","Team Trung 2",1512116400,2898000000],["EMP1048","Trần Quốc Nhân","Miền Trung","Team Trung 2",761124800,1780000000],["EMP1049","Nguyễn Đức Việt","Miền Trung","Team Trung 2",2466795900,2931200000],["EMP1050","Vũ Văn Trung","Miền Trung","Team Trung 2",3492253400,2751200000],["EMP1051","Lý Thanh Phúc","Miền Trung","Team Trung 2",1660292200,1503500000],
+["EMP1052","Lý Thị Thắng","Miền Nam","Team Nam 1",27067400,634200000],["EMP1053","Hồ Bá Việt","Miền Nam","Team Nam 1",1183112700,2512000000],["EMP1054","Hoàng Văn Hùng","Miền Nam","Team Nam 1",164439300,984400000],["EMP1055","Bùi Thị Kiên","Miền Nam","Team Nam 1",995804600,2158000000],["EMP1056","Bùi Bá Nam","Miền Nam","Team Nam 1",619971100,2612000000],["EMP1057","Huỳnh Thành Khoa","Miền Nam","Team Nam 1",2428440100,2647100000],["EMP1058","Vũ Hồng Tiến","Miền Nam","Team Nam 1",718105800,2217100000],["EMP1059","Đỗ Công Tuấn","Miền Nam","Team Nam 1",519989900,2516000000],["EMP1060","Phạm Xuân Uyên","Miền Nam","Team Nam 1",695437400,2050000000],["EMP1061","Đặng Hồng Long","Miền Nam","Team Nam 1",1129978700,2331200000],["EMP1062","Lý Thanh Tuấn","Miền Nam","Team Nam 1",436025800,2578800000],["EMP1063","Phạm Hữu Giang","Miền Nam","Team Nam 1",759954400,2280000000],["EMP1064","Vũ Thanh Linh","Miền Nam","Team Nam 1",943935300,2325100000],["EMP1065","Dương Hồng Thảo","Miền Nam","Team Nam 1",2077044500,1878800000],["EMP1066","Lê Hữu Uyên","Miền Nam","Team Nam 1",805349200,2136000000],
+["EMP1067","Đặng Đức Trung","Miền Nam","Team Nam 2",4302700,305800000],["EMP1068","Hoàng Bá Vân","Miền Nam","Team Nam 2",603117300,2094000000],["EMP1069","Phạm Minh Việt","Miền Nam","Team Nam 2",965658700,2114900000],["EMP1070","Phạm Xuân Linh","Miền Nam","Team Nam 2",612085700,1237000000],["EMP1071","Bùi Hữu Nhân","Miền Nam","Team Nam 2",740865900,1878800000],["EMP1072","Ngô Văn Kiên","Miền Nam","Team Nam 2",464802000,2194900000],["EMP1073","Lý Xuân Phúc","Miền Nam","Team Nam 2",456793800,2102000000],["EMP1074","Nguyễn Xuân Việt","Miền Nam","Team Nam 2",522027800,2362900000],["EMP1075","Bùi Văn Lộc","Miền Nam","Team Nam 2",190392000,1063500000],["EMP1076","Lê Văn Tâm","Miền Nam","Team Nam 2",607937500,1882000000],["EMP1077","Huỳnh Xuân Thắng","Miền Nam","Team Nam 2",539353000,2560000000],["EMP1078","Ngô Bá Dũng","Miền Nam","Team Nam 2",426179600,2465100000],["EMP1079","Phạm Thanh Bình","Miền Nam","Team Nam 2",10435254200,2558800000],["EMP1080","Trần Công Ngân","Miền Nam","Team Nam 2",405443000,2185100000],["EMP1081","Đỗ Hồng Khoa","Miền Nam","Team Nam 2",1193382400,2338000000],
+["EMP1082","Đỗ Thành Kiên","Miền Nam","Team Nam 3",17648200,769300000],["EMP1083","Ngô Thành Quân","Miền Nam","Team Nam 3",1412729000,2331200000],["EMP1084","Bùi Xuân Hải","Miền Nam","Team Nam 3",327524600,2058800000],["EMP1085","Lý Hữu Hùng","Miền Nam","Team Nam 3",763544700,2091200000],["EMP1086","Lê Hồng Thắng","Miền Nam","Team Nam 3",661523300,1867100000],["EMP1087","Lý Thanh Hà","Miền Nam","Team Nam 3",831762700,2092000000],["EMP1088","Đỗ Thành Kiên","Miền Nam","Team Nam 3",480383000,2042900000],["EMP1089","Đặng Thanh Yến","Miền Nam","Team Nam 3",695511800,2298800000],["EMP1090","Nguyễn Bá Nam","Miền Nam","Team Nam 3",720479700,2305100000],["EMP1091","Dương Thanh Trung","Miền Nam","Team Nam 3",455466000,2232000000],["EMP1092","Phạm Xuân Quân","Miền Nam","Team Nam 3",872261600,2084000000],["EMP1093","Bùi Quốc Phương","Miền Nam","Team Nam 3",687397200,1898800000],["EMP1094","Hoàng Thanh Khoa","Miền Nam","Team Nam 3",1420387500,2640000000],["EMP1095","Phạm Hồng Trung","Miền Nam","Team Nam 3",365245000,2122000000],["EMP1096","Lý Thanh Tiến","Miền Nam","Team Nam 3",423248100,2248000000],
+["EMP1097","Ngô Bá Lan","Miền Nam","Team Nam 4",16960200,923600000],["EMP1098","Hoàng Hồng Lan","Miền Nam","Team Nam 4",321899700,2204000000],["EMP1099","Đặng Hữu Việt","Miền Nam","Team Nam 4",551236300,2105100000],["EMP1100","Lý Thị Lộc","Miền Nam","Team Nam 4",119306000,1134000000],["EMP1101","Dương Công Tuấn","Miền Nam","Team Nam 4",874240100,2315200000],["EMP1102","Đỗ Công Phúc","Miền Nam","Team Nam 4",476633800,2538800000],["EMP1103","Vũ Minh Dũng","Miền Nam","Team Nam 4",961253600,1902000000],["EMP1104","Trần Đức Quân","Miền Nam","Team Nam 4",184218700,2089500000],["EMP1105","Vũ Hữu Trung","Miền Nam","Team Nam 4",310117600,2481200000],["EMP1106","Ngô Hữu Giang","Miền Nam","Team Nam 4",1004500800,2428800000],["EMP1107","Bùi Thanh Linh","Miền Nam","Team Nam 4",571758700,2322000000],["EMP1108","Dương Minh Tiến","Miền Nam","Team Nam 4",722965300,1877100000],["EMP1109","Hoàng Bá Vân","Miền Nam","Team Nam 4",812579700,2131200000],["EMP1110","Đỗ Minh Bình","Miền Nam","Team Nam 4",555577600,2302900000],["EMP1111","Nguyễn Đức Trung","Miền Nam","Team Nam 4",1558672700,2090000000]];
+// [name, tier, channel, orders, delivered_amount, fill_rate_pct]
+const DISTRIBUTORS=[
+["Công ty TNHH Trần Công Hùng Dịch vụ","Điểm bán lẻ","Traditional Trade",73,321456770,85.7],["Công ty TNHH Hồ Thành Quân Phân phối","Nhà phân phối cấp 1","Traditional Trade",74,344962110,84.2],["Công ty TNHH Ngô Bá Khoa Dịch vụ","Đại lý cấp 2","E-commerce",67,254071540,87.6],["Công ty Tư nhân Trần Thành Tâm Phân phối","Đại lý cấp 2","Traditional Trade",73,269475450,83.3],["Công ty Tư nhân Phạm Thành Hà Dịch vụ","Đại lý cấp 2","E-commerce",71,320585040,82.4],["Công ty CP Ngô Công Tuấn Phân phối","Nhà phân phối cấp 1","Traditional Trade",61,210042030,85.7],["Công ty CP Dương Thành Quân Phân phối","Nhà phân phối cấp 1","Traditional Trade",55,208594050,84.5],["Công ty Tư nhân Trần Bá Linh Phân phối","Đại lý cấp 2","Modern Trade",56,289123260,83.7],["Công ty Tư nhân Lê Quốc Tâm Dịch vụ","Đại lý cấp 2","Traditional Trade",62,266350000,84.6],["Công ty TNHH Ngô Thanh Lộc Phân phối","Đại lý cấp 2","E-commerce",81,330443220,83.9],
+["Công ty Tư nhân Hoàng Xuân Ngân Phân phối","Đại lý cấp 2","Modern Trade",62,218084770,84.4],["Công ty TNHH Ngô Hồng Sơn Phân phối","Đại lý cấp 2","Traditional Trade",82,336353550,85.3],["Công ty TNHH Ngô Minh Thảo Dịch vụ","Đại lý cấp 2","Traditional Trade",70,305247220,84.1],["Công ty TNHH Phạm Đức Sơn Dịch vụ","Điểm bán lẻ","Traditional Trade",47,195621690,82.7],["Công ty Tư nhân Trần Văn Thắng Dịch vụ","Nhà phân phối cấp 1","Modern Trade",67,243084660,85.3],["Công ty CP Đỗ Thị Dũng Phân phối","Điểm bán lẻ","Traditional Trade",63,238995710,84.5],["Công ty CP Nguyễn Văn Mai Thương mại","Điểm bán lẻ","E-commerce",56,200689510,85.4],["Công ty Tư nhân Dương Bá Hà Thương mại","Điểm bán lẻ","Traditional Trade",62,261710460,83.5],["Công ty CP Bùi Bá Quân Phân phối","Nhà phân phối cấp 1","E-commerce",55,217103810,85.1],["Công ty Tư nhân Trần Đức Thắng Phân phối","Đại lý cấp 2","Traditional Trade",73,304048720,86.3],
+["Công ty Tư nhân Đặng Minh Mai Dịch vụ","Đại lý cấp 2","Modern Trade",61,234100560,85.3],["Công ty Tư nhân Đặng Xuân Kiên Thương mại","Đại lý cấp 2","E-commerce",64,266231420,83.6],["Công ty CP Hoàng Đức Trung Phân phối","Nhà phân phối cấp 1","E-commerce",78,344011030,84.2],["Công ty TNHH Nguyễn Minh Thắng Phân phối","Điểm bán lẻ","Traditional Trade",70,292006130,84.3],["Công ty Tư nhân Ngô Quốc Hà Dịch vụ","Điểm bán lẻ","E-commerce",68,280448100,85.3],["Công ty Tư nhân Phạm Thanh Nhân Phân phối","Điểm bán lẻ","Modern Trade",56,211768020,84.3],["Công ty CP Ngô Hồng Hải Phân phối","Điểm bán lẻ","Traditional Trade",64,245745360,86.3],["Công ty Tư nhân Ngô Thanh Mai Dịch vụ","Điểm bán lẻ","Traditional Trade",81,347876510,83.9],["Công ty Tư nhân Lê Thanh An Thương mại","Đại lý cấp 2","E-commerce",63,247462530,85.5],["Công ty TNHH Trần Công Trung Dịch vụ","Điểm bán lẻ","Traditional Trade",50,248291850,85.8],
+["Công ty TNHH Ngô Công Hải Dịch vụ","Điểm bán lẻ","Modern Trade",65,255871690,83.7],["Công ty TNHH Phạm Công Tâm Thương mại","Đại lý cấp 2","E-commerce",75,286906400,84.2],["Công ty TNHH Huỳnh Công Hải Dịch vụ","Nhà phân phối cấp 1","E-commerce",69,304313230,84.0],["Công ty TNHH Nguyễn Công Khoa Thương mại","Điểm bán lẻ","E-commerce",48,223276800,84.9],["Công ty Tư nhân Huỳnh Hồng Tâm Phân phối","Đại lý cấp 2","Traditional Trade",69,294240690,85.4],["Công ty CP Ngô Văn Khoa Dịch vụ","Điểm bán lẻ","Modern Trade",65,272972680,84.9],["Công ty TNHH Đặng Công Hà Phân phối","Đại lý cấp 2","Modern Trade",64,235441640,87.7],["Công ty TNHH Bùi Thanh Quân Phân phối","Điểm bán lẻ","Modern Trade",57,239206400,82.2],["Công ty Tư nhân Trần Minh Tiến Dịch vụ","Điểm bán lẻ","E-commerce",70,259059110,84.6],["Công ty Tư nhân Dương Quốc Sơn Dịch vụ","Đại lý cấp 2","Traditional Trade",49,208853860,81.7],
+["Công ty TNHH Đặng Bá Khoa Phân phối","Điểm bán lẻ","E-commerce",67,296762880,85.2],["Công ty TNHH Nguyễn Hồng Thắng Phân phối","Đại lý cấp 2","Traditional Trade",61,285449810,85.1],["Công ty Tư nhân Huỳnh Bá Phúc Dịch vụ","Nhà phân phối cấp 1","Traditional Trade",68,302060300,84.7],["Công ty TNHH Bùi Hữu Trung Thương mại","Đại lý cấp 2","Modern Trade",63,284871130,85.7],["Công ty Tư nhân Huỳnh Thành Phúc Phân phối","Đại lý cấp 2","Traditional Trade",69,287535840,85.2],["Công ty CP Bùi Văn Hà Thương mại","Điểm bán lẻ","Modern Trade",60,239484710,83.0],["Công ty CP Dương Hồng Hà Dịch vụ","Điểm bán lẻ","Traditional Trade",77,396788260,84.0],["Công ty CP Lý Hồng Tuấn Phân phối","Đại lý cấp 2","E-commerce",68,215294250,85.0],["Công ty TNHH Huỳnh Văn Thắng Phân phối","Đại lý cấp 2","Traditional Trade",66,290534870,84.5],["Công ty TNHH Đỗ Hồng Long Thương mại","Đại lý cấp 2","Modern Trade",69,237799830,87.2],
+["Công ty TNHH Nguyễn Thành Tiến Dịch vụ","Đại lý cấp 2","E-commerce",70,329371580,84.8],["Công ty CP Bùi Hồng Kiên Phân phối","Điểm bán lẻ","Modern Trade",55,299925810,85.5],["Công ty Tư nhân Vũ Hữu Quân Dịch vụ","Nhà phân phối cấp 1","E-commerce",67,268864660,83.6],["Công ty TNHH Lê Đức Ngân Thương mại","Đại lý cấp 2","E-commerce",64,257651820,84.9],["Công ty TNHH Hồ Thanh An Phân phối","Điểm bán lẻ","Traditional Trade",55,252700530,84.0],["Công ty TNHH Đỗ Thị Nhân Thương mại","Điểm bán lẻ","E-commerce",67,262334630,84.2],["Công ty Tư nhân Hồ Văn Uyên Phân phối","Nhà phân phối cấp 1","E-commerce",70,318541620,84.6],["Công ty TNHH Vũ Hữu Tuấn Phân phối","Đại lý cấp 2","Traditional Trade",60,236552680,85.3],["Công ty Tư nhân Vũ Bá Lộc Phân phối","Nhà phân phối cấp 1","Traditional Trade",61,271492500,88.0],["Công ty CP Huỳnh Quốc An Phân phối","Điểm bán lẻ","E-commerce",60,240228530,83.9],
+["Công ty TNHH Đặng Quốc An Phân phối","Nhà phân phối cấp 1","Modern Trade",83,395914980,85.7],["Công ty Tư nhân Vũ Xuân Dũng Phân phối","Nhà phân phối cấp 1","Modern Trade",61,278817390,85.2],["Công ty CP Trần Minh Hải Dịch vụ","Đại lý cấp 2","Traditional Trade",61,207554400,83.5],["Công ty Tư nhân Nguyễn Minh Long Phân phối","Đại lý cấp 2","E-commerce",59,231882770,84.0],["Công ty TNHH Bùi Thành Trung Dịch vụ","Đại lý cấp 2","Traditional Trade",63,252327060,83.3],["Công ty CP Nguyễn Công Quân Dịch vụ","Đại lý cấp 2","Traditional Trade",54,219635320,83.9],["Công ty CP Dương Thành Khoa Phân phối","Điểm bán lẻ","Modern Trade",69,310832060,84.8],["Công ty TNHH Ngô Đức Hùng Thương mại","Điểm bán lẻ","Modern Trade",65,253255610,84.1],["Công ty CP Huỳnh Hữu Kiên Thương mại","Điểm bán lẻ","Traditional Trade",66,280167560,83.8],["Công ty CP Dương Thành Sơn Dịch vụ","Điểm bán lẻ","Traditional Trade",69,256598060,83.8],
+["Công ty TNHH Lê Văn Yến Phân phối","Đại lý cấp 2","E-commerce",64,263167530,82.7],["Công ty CP Ngô Thành Linh Phân phối","Đại lý cấp 2","Modern Trade",59,205306130,86.1],["Công ty CP Lê Công Mai Thương mại","Điểm bán lẻ","Traditional Trade",65,229291920,87.4],["Công ty Tư nhân Hoàng Minh Quân Thương mại","Đại lý cấp 2","E-commerce",53,203947210,86.6],["Công ty Tư nhân Trần Hồng Hải Dịch vụ","Đại lý cấp 2","Traditional Trade",56,243791650,84.8],["Công ty TNHH Ngô Thị Hà Phân phối","Đại lý cấp 2","E-commerce",73,326692590,85.0],["Công ty TNHH Vũ Công Long Dịch vụ","Đại lý cấp 2","Traditional Trade",58,249413180,85.7],["Công ty TNHH Dương Bá Lộc Dịch vụ","Đại lý cấp 2","Modern Trade",63,263348720,83.4],["Công ty CP Đỗ Văn Lộc Thương mại","Điểm bán lẻ","Traditional Trade",68,288259970,86.0],["Công ty TNHH Trần Đức Phúc Dịch vụ","Điểm bán lẻ","Traditional Trade",56,234876790,82.3],
+["Công ty TNHH Dương Minh Giang Phân phối","Điểm bán lẻ","Traditional Trade",74,248498090,82.7],["Công ty Tư nhân Lý Quốc Phúc Dịch vụ","Điểm bán lẻ","Modern Trade",76,347535830,84.4],["Công ty TNHH Lê Thành Thảo Dịch vụ","Đại lý cấp 2","E-commerce",55,229480120,84.3],["Công ty Tư nhân Lê Xuân Tuấn Dịch vụ","Đại lý cấp 2","E-commerce",61,246336540,83.7],["Công ty Tư nhân Hoàng Công Giang Dịch vụ","Điểm bán lẻ","Traditional Trade",68,279469820,84.4],["Công ty Tư nhân Hồ Hồng Linh Thương mại","Nhà phân phối cấp 1","Traditional Trade",53,192317670,85.8],["Công ty CP Đặng Quốc Sơn Thương mại","Đại lý cấp 2","E-commerce",59,320132820,86.0],["Công ty TNHH Lý Văn Hải Phân phối","Nhà phân phối cấp 1","Traditional Trade",66,333357730,86.5],["Công ty TNHH Bùi Quốc Yến Dịch vụ","Điểm bán lẻ","Traditional Trade",54,263396990,84.1],["Công ty TNHH Nguyễn Hữu Giang Dịch vụ","Điểm bán lẻ","E-commerce",54,224187920,83.8],
+["Công ty CP Hồ Bá Hà Thương mại","Nhà phân phối cấp 1","E-commerce",75,286338720,81.1],["Công ty CP Đỗ Minh Giang Dịch vụ","Điểm bán lẻ","Modern Trade",65,307522970,84.0],["Công ty CP Huỳnh Hữu Việt Dịch vụ","Điểm bán lẻ","Traditional Trade",68,305434490,82.6],["Công ty CP Vũ Hồng Nhân Thương mại","Nhà phân phối cấp 1","Traditional Trade",57,237825960,84.5],["Công ty TNHH Bùi Minh Phương Thương mại","Đại lý cấp 2","E-commerce",65,257744170,84.6],["Công ty Tư nhân Nguyễn Xuân Việt Phân phối","Nhà phân phối cấp 1","Modern Trade",72,368285860,86.0],["Công ty Tư nhân Nguyễn Minh Linh Dịch vụ","Nhà phân phối cấp 1","Traditional Trade",56,215733580,85.5],["Công ty TNHH Lê Minh Nhân Dịch vụ","Đại lý cấp 2","Modern Trade",58,221516560,83.0],["Công ty TNHH Ngô Thanh Dũng Dịch vụ","Điểm bán lẻ","Modern Trade",55,202868730,85.5],["Công ty CP Hoàng Công Quân Dịch vụ","Đại lý cấp 2","Modern Trade",69,257936060,84.1],
+["Công ty TNHH Dương Hồng Sơn Thương mại","Đại lý cấp 2","E-commerce",59,237982890,85.9],["Công ty CP Phạm Thị Ngân Thương mại","Điểm bán lẻ","E-commerce",73,233200930,84.7],["Công ty Tư nhân Trần Thị Dũng Dịch vụ","Đại lý cấp 2","Traditional Trade",73,279188100,86.4],["Công ty TNHH Phạm Xuân Hải Thương mại","Nhà phân phối cấp 1","E-commerce",48,212462100,85.2],["Công ty CP Dương Hữu Dũng Thương mại","Đại lý cấp 2","Traditional Trade",66,299297380,83.6],["Công ty Tư nhân Đỗ Văn Hải Thương mại","Đại lý cấp 2","E-commerce",54,203692210,84.1],["Công ty Tư nhân Đỗ Hồng Phúc Phân phối","Nhà phân phối cấp 1","E-commerce",55,237781250,84.2],["Công ty CP Đặng Minh Thắng Phân phối","Điểm bán lẻ","Traditional Trade",51,259981790,84.8],["Công ty Tư nhân Bùi Thành Cường Thương mại","Đại lý cấp 2","Modern Trade",60,229603280,85.5],["Công ty CP Phạm Thị Linh Thương mại","Điểm bán lẻ","Traditional Trade",65,283458280,84.8],
+["Công ty CP Ngô Công Hà Thương mại","Đại lý cấp 2","Modern Trade",70,309925940,85.4],["Công ty TNHH Lê Công Tâm Phân phối","Nhà phân phối cấp 1","Modern Trade",72,284581840,85.4],["Công ty Tư nhân Bùi Bá Tiến Dịch vụ","Đại lý cấp 2","Traditional Trade",65,240626770,84.3],["Công ty TNHH Đỗ Công An Phân phối","Điểm bán lẻ","Traditional Trade",68,288550050,84.7],["Công ty TNHH Nguyễn Quốc Trung Dịch vụ","Nhà phân phối cấp 1","E-commerce",54,219989740,84.3],["Công ty CP Phạm Thanh Lộc Phân phối","Nhà phân phối cấp 1","Modern Trade",66,275906360,88.7],["Công ty TNHH Đỗ Quốc An Dịch vụ","Điểm bán lẻ","E-commerce",70,259761690,85.8],["Công ty TNHH Nguyễn Văn Uyên Phân phối","Điểm bán lẻ","Traditional Trade",59,240053710,83.2],["Công ty TNHH Trần Quốc Ngân Dịch vụ","Đại lý cấp 2","Modern Trade",64,255438930,84.8],["Công ty Tư nhân Nguyễn Thành Dũng Thương mại","Đại lý cấp 2","Traditional Trade",64,264704320,83.9],
+["Công ty CP Đặng Thanh Ngân Dịch vụ","Điểm bán lẻ","Modern Trade",66,292723820,83.3],["Công ty Tư nhân Lê Quốc Phương Thương mại","Nhà phân phối cấp 1","Modern Trade",59,249214170,84.5],["Công ty TNHH Vũ Đức Thắng Dịch vụ","Điểm bán lẻ","Modern Trade",66,246646720,84.8],["Công ty CP Lý Bá Khoa Dịch vụ","Điểm bán lẻ","Traditional Trade",70,317269580,84.8],["Công ty CP Nguyễn Quốc Uyên Phân phối","Nhà phân phối cấp 1","E-commerce",65,282142580,84.9]];
+
+// ===== HELPERS =====
+const COLORS=['#4C72B0','#DD8452','#55A868','#C44E52','#8172B3','#937860'];
+const MN=['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
+function fmtVND(v){
+  if(v==null||isNaN(v))return '–';
+  const a=Math.abs(v);
+  if(a>=1e9)return (v/1e9).toFixed(1).replace('.',',')+' tỷ';
+  if(a>=1e6)return (v/1e6).toFixed(1).replace('.',',')+' tr';
+  return v.toLocaleString('vi-VN');
+}
+function fmtN(v){return v==null?'–':v.toLocaleString('vi-VN')}
+function fmtPct(v){return (v*100).toFixed(1).replace('.',',')+'%'}
+function achPill(p){
+  const cls=p<0.5?'p-red':p<0.8?'p-org':p<1?'p-yel':'p-grn';
+  return `<span class="pill ${cls}">${fmtPct(p)}</span>`;
+}
+
+// ===== DASHBOARD =====
+const D={
+  charts:{},
+  init(){
+    this.fill('f-region',[...new Set(MONTHLY.map(r=>r[1]))]);
+    this.fill('f-channel',[...new Set(MONTHLY.map(r=>r[2]))]);
+    this.staticCharts();
+    this.empSort={col:6,dir:-1};this.distSort={col:4,dir:-1};
+    this.apply();
+  },
+  fill(id,vals){
+    const s=document.getElementById(id);
+    vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;s.appendChild(o)});
+  },
+  fdata(){
+    const r=document.getElementById('f-region').value,c=document.getElementById('f-channel').value;
+    return MONTHLY.filter(x=>(r==='all'||x[1]===r)&&(c==='all'||x[2]===c));
+  },
+  apply(){
+    const d=this.fdata();
+    const r=document.getElementById('f-region').value,c=document.getElementById('f-channel').value;
+    // KPIs
+    const sales=d.reduce((a,x)=>a+x[3],0),orders=d.reduce((a,x)=>a+x[4],0);
+    const totAct=TARGET.reduce((a,x)=>a+x[1],0),totTgt=TARGET.reduce((a,x)=>a+x[2],0);
+    const totRet=RETURNS.reduce((a,x)=>a+x[1],0),totSalesAll=MONTHLY.reduce((a,x)=>a+x[3],0);
+    document.getElementById('k-sales').textContent=fmtVND(sales);
+    document.getElementById('k-sales-n').textContent=(r==='all'&&c==='all')?'toàn công ty 2024':`bộ lọc: ${r==='all'?'tất cả miền':r} · ${c==='all'?'tất cả kênh':c}`;
+    document.getElementById('k-orders').textContent=fmtN(orders);
+    document.getElementById('k-aov').textContent='TB '+fmtVND(orders?sales/orders:0)+' / đơn';
+    document.getElementById('k-ach').textContent=fmtPct(totAct/totTgt);
+    document.getElementById('k-ret').textContent=fmtPct(totRet/totSalesAll);
+    document.getElementById('k-ret-n').textContent=fmtVND(totRet)+' giá trị trả';
+    document.getElementById('t-trend').textContent=(r==='all'&&c==='all')?'':' — đã lọc';
+    // trend
+    const bym=Array(12).fill(0);d.forEach(x=>bym[x[0]-1]+=x[3]);
+    this.up('trend',MN,[bym]);
+    // channel donut (respect region filter only)
+    const chD={};MONTHLY.filter(x=>r==='all'||x[1]===r).forEach(x=>chD[x[2]]=(chD[x[2]]||0)+x[3]);
+    this.up('channel',Object.keys(chD),[Object.values(chD)]);
+    // region bar (respect channel filter only)
+    const rgD={};MONTHLY.filter(x=>c==='all'||x[2]===c).forEach(x=>rgD[x[1]]=(rgD[x[1]]||0)+x[3]);
+    this.up('region',Object.keys(rgD),[Object.values(rgD)]);
+    this.renderEmp();this.renderDist();
+  },
+  up(key,labels,data){
+    const ch=this.charts[key];if(!ch)return;
+    ch.data.labels=labels;
+    data.forEach((arr,i)=>ch.data.datasets[i].data=arr);
+    ch.update('none');
+  },
+  staticCharts(){
+    const money=v=>fmtVND(v);
+    const base={responsive:true,maintainAspectRatio:false};
+    this.charts.trend=new Chart(document.getElementById('c-trend'),{type:'line',data:{labels:MN,datasets:[{label:'Doanh thu thuần',data:[],borderColor:COLORS[0],backgroundColor:COLORS[0]+'20',borderWidth:2,fill:true,tension:.3,pointRadius:3}]},options:{...base,plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>' '+money(x.parsed.y)}}},scales:{y:{beginAtZero:true,ticks:{callback:money}},x:{grid:{display:false}}}}});
+    this.charts.target=new Chart(document.getElementById('c-target'),{type:'bar',data:{labels:MN,datasets:[
+      {label:'Thực tế',data:TARGET.map(x=>x[1]),backgroundColor:COLORS[0]+'CC',borderRadius:4},
+      {label:'Mục tiêu',data:TARGET.map(x=>x[2]),type:'line',borderColor:COLORS[3],borderWidth:2,pointRadius:3,tension:.2}
+    ]},options:{...base,plugins:{legend:{position:'top',labels:{usePointStyle:true}},tooltip:{callbacks:{label:x=>` ${x.dataset.label}: ${money(x.parsed.y)}`}}},scales:{y:{beginAtZero:true,ticks:{callback:money}},x:{grid:{display:false}}}}});
+    this.charts.channel=new Chart(document.getElementById('c-channel'),{type:'doughnut',data:{labels:[],datasets:[{data:[],backgroundColor:COLORS.map(c=>c+'CC'),borderColor:'#fff',borderWidth:2}]},options:{...base,cutout:'60%',plugins:{legend:{position:'bottom',labels:{usePointStyle:true}},tooltip:{callbacks:{label:x=>{const t=x.dataset.data.reduce((a,b)=>a+b,0);return ` ${x.label}: ${money(x.parsed)} (${(100*x.parsed/t).toFixed(1)}%)`}}}}}});
+    this.charts.region=new Chart(document.getElementById('c-region'),{type:'bar',data:{labels:[],datasets:[{data:[],backgroundColor:[COLORS[0]+'CC',COLORS[1]+'CC',COLORS[2]+'CC'],borderRadius:4}]},options:{...base,plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>' '+money(x.parsed.y)}}},scales:{y:{beginAtZero:true,ticks:{callback:money}},x:{grid:{display:false}}}}});
+    this.charts.cat=new Chart(document.getElementById('c-cat'),{type:'doughnut',data:{labels:CATEGORY.map(x=>x[0]),datasets:[{data:CATEGORY.map(x=>x[1]),backgroundColor:COLORS.map(c=>c+'CC'),borderColor:'#fff',borderWidth:2}]},options:{...base,cutout:'60%',plugins:{legend:{position:'bottom',labels:{usePointStyle:true}},tooltip:{callbacks:{label:x=>{const t=x.dataset.data.reduce((a,b)=>a+b,0);return ` ${x.label}: ${money(x.parsed)} (${(100*x.parsed/t).toFixed(1)}%)`}}}}}});
+    this.charts.prod=new Chart(document.getElementById('c-prod'),{type:'bar',data:{labels:TOP_PRODUCTS.map(x=>x[0]),datasets:[{data:TOP_PRODUCTS.map(x=>x[2]),backgroundColor:COLORS[0]+'CC',borderRadius:4}]},options:{...base,indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>' '+money(x.parsed.x)}}},scales:{x:{beginAtZero:true,ticks:{callback:money}},y:{grid:{display:false}}}}});
+    this.charts.reason=new Chart(document.getElementById('c-reason'),{type:'bar',data:{labels:REASONS.map(x=>x[0]),datasets:[{data:REASONS.map(x=>x[1]),backgroundColor:COLORS[3]+'CC',borderRadius:4}]},options:{...base,indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>' '+money(x.parsed.x)}}},scales:{x:{beginAtZero:true,ticks:{callback:money}},y:{grid:{display:false}}}}});
+  },
+  renderEmp(){
+    const r=document.getElementById('f-region').value;
+    let rows=EMPLOYEES.filter(e=>r==='all'||e[2]===r).map(e=>[...e,e[4]/e[5]]);
+    const{col,dir}=this.empSort;
+    rows.sort((a,b)=>(a[col]<b[col]?-1:a[col]>b[col]?1:0)*dir);
+    const cols=['Mã NV','Họ tên','Miền','Team','Thực tế','Mục tiêu','Đạt (%)'];
+    let h='<table><thead><tr>'+cols.map((c,i)=>`<th class="${i>=4?'num':''}" onclick="D.sortEmp(${i===6?6:i===4?4:i===5?5:i})">${c}${this.empSort.col===i?(dir===1?' ▲':' ▼'):''}</th>`).join('')+'</tr></thead><tbody>';
+    rows.forEach(e=>{h+=`<tr><td>${e[0]}</td><td>${e[1]}</td><td>${e[2]}</td><td>${e[3]}</td><td class="num">${fmtVND(e[4])}</td><td class="num">${fmtVND(e[5])}</td><td class="num">${achPill(e[6])}</td></tr>`});
+    document.getElementById('t-emp').innerHTML=h+'</tbody></table>';
+  },
+  sortEmp(c){this.empSort=this.empSort.col===c?{col:c,dir:-this.empSort.dir}:{col:c,dir:-1};this.renderEmp()},
+  renderDist(){
+    let rows=[...DISTRIBUTORS];
+    const{col,dir}=this.distSort;
+    rows.sort((a,b)=>(a[col]<b[col]?-1:a[col]>b[col]?1:0)*dir);
+    const cols=['Nhà phân phối','Tier','Kênh','Số đơn','Giá trị giao','Fill rate (%)'];
+    let h='<table><thead><tr>'+cols.map((c,i)=>`<th class="${i>=3?'num':''}" onclick="D.sortDist(${i})">${c}${this.distSort.col===i?(dir===1?' ▲':' ▼'):''}</th>`).join('')+'</tr></thead><tbody>';
+    rows.forEach(d=>{h+=`<tr><td>${d[0]}</td><td>${d[1]}</td><td>${d[2]}</td><td class="num">${fmtN(d[3])}</td><td class="num">${fmtVND(d[4])}</td><td class="num">${d[5].toFixed(1).replace('.',',')}</td></tr>`});
+    document.getElementById('t-dist').innerHTML=h+'</tbody></table>';
+  },
+  sortDist(c){this.distSort=this.distSort.col===c?{col:c,dir:-this.distSort.dir}:{col:c,dir:-1};this.renderDist()}
+};
+D.init();
+</script>
+</body>
+</html>

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VietDist Sales Analytics — 2024</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1"></script>
+<style>
+:root{--bg:#f8f9fa;--card:#fff;--hdr:#1a1a2e;--txt:#212529;--sub:#6c757d;--c1:#4C72B0;--c2:#DD8452;--c3:#55A868;--c4:#C44E52;--c5:#8172B3;--c6:#937860;--pos:#28a745;--neg:#dc3545;--gap:16px;--r:8px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--txt);line-height:1.5}
+.wrap{max-width:1400px;margin:0 auto;padding:var(--gap)}
+.hdr{background:var(--hdr);color:#fff;padding:18px 24px;border-radius:var(--r);margin-bottom:var(--gap);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.hdr h1{font-size:20px;font-weight:600}
+.hdr .sub{font-size:12px;color:rgba(255,255,255,.6)}
+.filters{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.fg{display:flex;align-items:center;gap:6px}
+.fg label{font-size:12px;color:rgba(255,255,255,.7)}
+.fg select,.fg input{padding:6px 10px;border:1px solid rgba(255,255,255,.25);border-radius:4px;background:rgba(255,255,255,.1);color:#fff;font-size:13px}
+.fg select option{background:var(--hdr);color:#fff}
+.tabs{display:flex;gap:8px;margin-bottom:var(--gap)}
+.tab{padding:10px 20px;border-radius:var(--r);background:var(--card);cursor:pointer;font-size:14px;font-weight:600;color:var(--sub);box-shadow:0 1px 3px rgba(0,0,0,.08);border:2px solid transparent}
+.tab.active{color:var(--c1);border-color:var(--c1)}
+.page{display:none}.page.active{display:block}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--gap);margin-bottom:var(--gap)}
+.kpi{background:var(--card);border-radius:var(--r);padding:18px 22px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.kpi .l{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.kpi .v{font-size:26px;font-weight:700}
+.kpi .s{font-size:12px;color:var(--sub);margin-top:2px}
+.kpi .s.neg{color:var(--neg)} .kpi .s.pos{color:var(--pos)}
+.row{display:grid;gap:var(--gap);margin-bottom:var(--gap)}
+.r2{grid-template-columns:2fr 1fr}.r11{grid-template-columns:1fr 1fr}
+.card{background:var(--card);border-radius:var(--r);padding:18px 22px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.card h3{font-size:14px;font-weight:600;margin-bottom:14px}
+.ch{position:relative;height:300px}
+.tblwrap{overflow-x:auto;max-height:480px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{text-align:left;padding:9px 12px;border-bottom:2px solid #dee2e6;color:var(--sub);font-size:11px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;cursor:pointer;user-select:none;position:sticky;top:0;background:var(--card)}
+thead th:hover{color:var(--txt)}
+tbody td{padding:8px 12px;border-bottom:1px solid #f0f0f0;white-space:nowrap}
+tbody tr:hover{background:#f8f9fa}
+.num{text-align:right}
+.bar{display:inline-block;height:10px;border-radius:5px;background:var(--c1);vertical-align:middle;margin-right:6px}
+.pct-good{color:var(--pos);font-weight:600}.pct-mid{color:#e0a800;font-weight:600}.pct-bad{color:var(--neg);font-weight:600}
+.note{font-size:12px;color:var(--sub);margin-top:8px}
+.foot{font-size:12px;color:var(--sub);text-align:center;padding:8px}
+@media(max-width:900px){.r2,.r11{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <div><h1>VietDist Sales Analytics — 2024</h1><div class="sub">Source: vietdist_dw (dwh layer) · 119,101 sales lines · 50,000 orders</div></div>
+    <div class="filters">
+      <div class="fg"><label>Region</label><select id="fRegion" onchange="app.refresh()"><option value="all">All</option></select></div>
+      <div class="fg"><label>Channel</label><select id="fChannel" onchange="app.refresh()"><option value="all">All</option></select></div>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" onclick="app.tab(0,this)">Executive Overview</div>
+    <div class="tab" onclick="app.tab(1,this)">Sales vs Target</div>
+    <div class="tab" onclick="app.tab(2,this)">Distributor Performance</div>
+  </div>
+
+  <!-- PAGE 1 -->
+  <div class="page active" id="p0">
+    <section class="kpis">
+      <div class="kpi"><div class="l">Total Sales</div><div class="v" id="k_sales"></div><div class="s" id="k_sales_s"></div></div>
+      <div class="kpi"><div class="l">Orders</div><div class="v" id="k_orders"></div><div class="s" id="k_orders_s"></div></div>
+      <div class="kpi"><div class="l">Quantity Sold</div><div class="v" id="k_qty"></div><div class="s">units</div></div>
+      <div class="kpi"><div class="l">Return Rate</div><div class="v" id="k_ret"></div><div class="s">of total sales value (company-wide)</div></div>
+    </section>
+    <div class="row r2">
+      <div class="card"><h3>Monthly Sales Trend</h3><div class="ch"><canvas id="cTrend"></canvas></div></div>
+      <div class="card"><h3>Sales by Channel</h3><div class="ch"><canvas id="cChannel"></canvas></div></div>
+    </div>
+    <div class="row r11">
+      <div class="card"><h3>Sales by Region</h3><div class="ch"><canvas id="cRegion"></canvas></div></div>
+      <div class="card"><h3>Returns by Reason (company-wide)</h3><div class="ch"><canvas id="cReturns"></canvas></div></div>
+    </div>
+    <div class="row">
+      <div class="card"><h3>Top 10 Products by Sales (company-wide)</h3><div class="ch"><canvas id="cProducts"></canvas></div><div class="note">Product-level data is not split by region/channel — header filters do not apply to this chart.</div></div>
+    </div>
+  </div>
+
+  <!-- PAGE 2 -->
+  <div class="page" id="p1">
+    <section class="kpis">
+      <div class="kpi"><div class="l">Actual Sales</div><div class="v" id="k_act"></div></div>
+      <div class="kpi"><div class="l">Target Revenue</div><div class="v" id="k_tgt"></div></div>
+      <div class="kpi"><div class="l">Variance</div><div class="v" id="k_var"></div></div>
+      <div class="kpi"><div class="l">Achievement</div><div class="v" id="k_ach"></div><div class="s neg" id="k_ach_s"></div></div>
+    </section>
+    <div class="row">
+      <div class="card"><h3>Actual vs Target by Month</h3><div class="ch"><canvas id="cAvT"></canvas></div></div>
+    </div>
+    <div class="row">
+      <div class="card">
+        <h3>Employee Achievement — 2024 Annual</h3>
+        <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+          <select id="fTeam" onchange="app.renderEmp()" style="padding:6px 10px;border:1px solid #dee2e6;border-radius:4px;font-size:13px"><option value="all">All teams</option></select>
+          <input id="fEmp" oninput="app.renderEmp()" placeholder="Search name / ID…" style="padding:6px 10px;border:1px solid #dee2e6;border-radius:4px;font-size:13px;flex:1;min-width:160px">
+        </div>
+        <div class="tblwrap"><table id="tEmp"></table></div>
+        <div class="note">Employee filter uses the Region filter in the header too. Click column headers to sort. Green ≥ 100% · Amber 80–100% · Red &lt; 80%.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 3 -->
+  <div class="page" id="p2">
+    <section class="kpis">
+      <div class="kpi"><div class="l">Distributors (with orders)</div><div class="v" id="k_dist"></div><div class="s">of 138 in master</div></div>
+      <div class="kpi"><div class="l">Distributor Orders</div><div class="v" id="k_dorders"></div></div>
+      <div class="kpi"><div class="l">Delivered Amount</div><div class="v" id="k_deliv"></div></div>
+      <div class="kpi"><div class="l">Avg Fill Rate</div><div class="v" id="k_fill"></div></div>
+    </section>
+    <div class="row">
+      <div class="card"><h3>Top 15 Distributors by Delivered Amount</h3><div class="ch"><canvas id="cDist"></canvas></div></div>
+    </div>
+    <div class="row">
+      <div class="card">
+        <h3>All Distributors</h3>
+        <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+          <select id="fTier" onchange="app.renderDist()" style="padding:6px 10px;border:1px solid #dee2e6;border-radius:4px;font-size:13px"><option value="all">All tiers</option></select>
+          <input id="fDist" oninput="app.renderDist()" placeholder="Search distributor…" style="padding:6px 10px;border:1px solid #dee2e6;border-radius:4px;font-size:13px;flex:1;min-width:160px">
+        </div>
+        <div class="tblwrap"><table id="tDist"></table></div>
+        <div class="note">Channel column here is the distributor's own channel; the header Channel filter applies. On-time rate omitted — source flag needs re-parsing (all zeros in current mart).</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">VietDist Analytics · data extracted from PostgreSQL vietdist_dw via Power BI model · 2024 full year · design mockup for vietdist_dashboard.pbix</div>
+</div>
+
+<script>
+// ============ EMBEDDED DATA (from dwh, 2024) ============
+// [year,month,region,channel,sales,orders,qty]
+const MONTHLY=[[1,"Miền Nam","Modern Trade",2248901300,678,103359],[2,"Miền Nam","Modern Trade",1093381200,353,52676],[3,"Miền Nam","Modern Trade",1422823900,428,66823],[4,"Miền Nam","Modern Trade",1288694700,397,59229],[5,"Miền Nam","Modern Trade",1520839200,474,69754],[6,"Miền Nam","Modern Trade",1491294700,474,70170],[7,"Miền Nam","Modern Trade",1183535600,368,55026],[8,"Miền Nam","Modern Trade",1510603400,481,71652],[9,"Miền Nam","Modern Trade",1591906800,495,73891],[10,"Miền Nam","Modern Trade",1302900400,410,60707],[11,"Miền Nam","Modern Trade",1355967200,444,66281],[12,"Miền Nam","Modern Trade",1856622300,598,86960],
+[1,"Miền Trung","Modern Trade",2997167300,957,143837],[2,"Miền Trung","Modern Trade",1342832700,442,63051],[3,"Miền Trung","Modern Trade",1939571800,615,92850],[4,"Miền Trung","Modern Trade",1796364800,548,82594],[5,"Miền Trung","Modern Trade",2042960900,651,96458],[6,"Miền Trung","Modern Trade",2109060500,671,100409],[7,"Miền Trung","Modern Trade",1627052800,547,78722],[8,"Miền Trung","Modern Trade",2108954000,640,99943],[9,"Miền Trung","Modern Trade",2292908900,704,105255],[10,"Miền Trung","Modern Trade",1604011600,509,76279],[11,"Miền Trung","Modern Trade",2008340900,634,96336],[12,"Miền Trung","Modern Trade",2769912000,868,131928],
+[1,"Miền Bắc","Modern Trade",2302219200,707,107772],[2,"Miền Bắc","Modern Trade",1095688900,340,52409],[3,"Miền Bắc","Modern Trade",1729595700,557,80161],[4,"Miền Bắc","Modern Trade",1231283000,375,56774],[5,"Miền Bắc","Modern Trade",1464139100,452,68298],[6,"Miền Bắc","Modern Trade",1761536200,541,83831],[7,"Miền Bắc","Modern Trade",1275751500,430,60762],[8,"Miền Bắc","Modern Trade",1429538500,439,66723],[9,"Miền Bắc","Modern Trade",1633593600,514,75700],[10,"Miền Bắc","Modern Trade",1300354900,398,60729],[11,"Miền Bắc","Modern Trade",1703698500,516,78827],[12,"Miền Bắc","Modern Trade",1857763500,631,89628],
+[1,"Miền Nam","Traditional Trade",3430833900,1035,157670],[2,"Miền Nam","Traditional Trade",1532939100,496,71733],[3,"Miền Nam","Traditional Trade",2172221100,705,101125],[4,"Miền Nam","Traditional Trade",1995661300,620,97505],[5,"Miền Nam","Traditional Trade",2165265400,667,99121],[6,"Miền Nam","Traditional Trade",2305741400,714,108713],[7,"Miền Nam","Traditional Trade",2088170200,632,98276],[8,"Miền Nam","Traditional Trade",2227182100,711,105658],[9,"Miền Nam","Traditional Trade",2291507700,744,109173],[10,"Miền Nam","Traditional Trade",1702419900,547,80813],[11,"Miền Nam","Traditional Trade",2049344500,635,92283],[12,"Miền Nam","Traditional Trade",2870598800,907,136690],
+[1,"Miền Trung","Traditional Trade",2666982400,819,120793],[2,"Miền Trung","Traditional Trade",1202673900,390,56850],[3,"Miền Trung","Traditional Trade",1689658900,557,80333],[4,"Miền Trung","Traditional Trade",1571036100,491,72998],[5,"Miền Trung","Traditional Trade",1666269400,514,77519],[6,"Miền Trung","Traditional Trade",2051859600,639,97287],[7,"Miền Trung","Traditional Trade",1507510900,460,68005],[8,"Miền Trung","Traditional Trade",2020435800,583,92869],[9,"Miền Trung","Traditional Trade",2091079000,668,97984],[10,"Miền Trung","Traditional Trade",1336410900,453,63556],[11,"Miền Trung","Traditional Trade",1840147100,547,86217],[12,"Miền Trung","Traditional Trade",2435089100,735,112830],
+[1,"Miền Bắc","Traditional Trade",3054959200,949,141638],[2,"Miền Bắc","Traditional Trade",1404661100,450,66397],[3,"Miền Bắc","Traditional Trade",2001829200,612,93849],[4,"Miền Bắc","Traditional Trade",1749664400,542,82090],[5,"Miền Bắc","Traditional Trade",2124167000,632,96467],[6,"Miền Bắc","Traditional Trade",2290361800,715,106336],[7,"Miền Bắc","Traditional Trade",1773713500,566,83273],[8,"Miền Bắc","Traditional Trade",1816468700,607,87139],[9,"Miền Bắc","Traditional Trade",2172790500,692,101376],[10,"Miền Bắc","Traditional Trade",1771581500,592,85577],[11,"Miền Bắc","Traditional Trade",1941891500,606,91072],[12,"Miền Bắc","Traditional Trade",2858841900,884,132179],
+[1,"Miền Nam","E-commerce",826396100,241,37202],[2,"Miền Nam","E-commerce",396885100,133,19626],[3,"Miền Nam","E-commerce",468083900,159,21628],[4,"Miền Nam","E-commerce",381604000,133,18860],[5,"Miền Nam","E-commerce",462297000,153,22326],[6,"Miền Nam","E-commerce",560313800,194,27257],[7,"Miền Nam","E-commerce",316444500,106,14736],[8,"Miền Nam","E-commerce",526356100,178,25029],[9,"Miền Nam","E-commerce",652021700,194,30019],[10,"Miền Nam","E-commerce",391205600,126,18118],[11,"Miền Nam","E-commerce",470568500,153,21885],[12,"Miền Nam","E-commerce",730052200,219,33792],
+[1,"Miền Trung","E-commerce",1362609900,424,63370],[2,"Miền Trung","E-commerce",675894300,220,32415],[3,"Miền Trung","E-commerce",852719600,278,41046],[4,"Miền Trung","E-commerce",838724900,264,39529],[5,"Miền Trung","E-commerce",791404400,282,38905],[6,"Miền Trung","E-commerce",1038232700,343,48178],[7,"Miền Trung","E-commerce",798949900,250,37301],[8,"Miền Trung","E-commerce",795805400,252,36628],[9,"Miền Trung","E-commerce",1027877800,340,49732],[10,"Miền Trung","E-commerce",855534500,272,40802],[11,"Miền Trung","E-commerce",938037600,301,42635],[12,"Miền Trung","E-commerce",1238605200,408,57397],
+[1,"Miền Bắc","E-commerce",822171100,221,37048],[2,"Miền Bắc","E-commerce",396054500,120,19357],[3,"Miền Bắc","E-commerce",408304200,139,20290],[4,"Miền Bắc","E-commerce",532065900,165,25257],[5,"Miền Bắc","E-commerce",518181900,160,24757],[6,"Miền Bắc","E-commerce",551372700,181,25573],[7,"Miền Bắc","E-commerce",387917100,131,19656],[8,"Miền Bắc","E-commerce",493385700,156,22792],[9,"Miền Bắc","E-commerce",635130100,199,28207],[10,"Miền Bắc","E-commerce",433452300,123,18538],[11,"Miền Bắc","E-commerce",458544600,152,21110],[12,"Miền Bắc","E-commerce",760618100,228,34877]];
+// [month, actual, target] (company-wide, latest plan version)
+const TGT=[[1,19712240400,30812700000],[2,9141010800,15272900000],[3,12684808300,20541900000],[4,11385099100,17974600000],[5,12755524300,20541900000],[6,14159773400,23109400000],[7,10959046000,17189500000],[8,12928729700,19672000000],[9,14388816100,22099300000],[10,10697871600,17297000000],[11,12766540400,19614700000],[12,17378103100,27260600000]];
+// [product, category, sales]
+const PROD=[["Nước uống đóng chai Loại B","Thức uống",3991476500],["Nước rửa chén Premium","Gia dụng",3966629000],["Nước uống đóng chai Premium","Thức uống",3786333000],["Gia vị Premium","Thực phẩm",3742223000],["Nước tăng lực Loại B","Thức uống",3234564800],["Cháo ăn liền Standard","Thực phẩm",3221426400],["Dầu gội Premium","Chăm sóc cá nhân",3165613200],["Nước lau sàn Standard","Gia dụng",3127354000],["Nước tăng lực Standard","Thức uống",3057170400],["Sữa Loại B","Thức uống",2946978800],["Cháo ăn liền Premium","Thực phẩm",2934297600],["Nước uống đóng chai Mini","Thức uống",2862406400],["Sữa tắm Mini","Chăm sóc cá nhân",2828972200],["Bột giặt Standard","Gia dụng",2805821400],["Sữa Loại A","Thức uống",2788449200],["Bột giặt Đặc biệt","Gia dụng",2786612300],["Sữa Standard","Thức uống",2773756300],["Nước tăng lực Mini","Thức uống",2754241800],["Sữa tắm Đặc biệt","Chăm sóc cá nhân",2750007600],["Nước tăng lực Combo","Thức uống",2746087900],["Kem đánh răng Standard","Chăm sóc cá nhân",2478741000],["Dầu gội Standard","Chăm sóc cá nhân",2726096700],["Dầu gội Đặc biệt","Chăm sóc cá nhân",2680636700],["Cháo ăn liền Combo","Thực phẩm",2640571500],["Nước rửa chén Standard","Gia dụng",2626323800],["Nước lau sàn Mini","Gia dụng",2588743300],["Trà đóng chai Standard","Thức uống",2851592900],["Nước uống đóng chai Family Pack","Thức uống",2405154600],["Nước tăng lực Đặc biệt","Thức uống",2420405700],["Mì ăn liền Mini","Thực phẩm",2351393400]];
+// category totals
+const CAT=[["Thức uống",56276055100],["Thực phẩm",34524955500],["Chăm sóc cá nhân",28852524900],["Gia dụng",30204389600]];
+// [month, reason, amount]
+const RET=[[1,"Hàng lỗi",13323000],[2,"Hàng lỗi",17403500],[3,"Hàng lỗi",13594500],[4,"Hàng lỗi",19866000],[5,"Hàng lỗi",13646500],[6,"Hàng lỗi",18144500],[7,"Hàng lỗi",16127000],[8,"Hàng lỗi",19260000],[9,"Hàng lỗi",15015000],[10,"Hàng lỗi",17688000],[11,"Hàng lỗi",13077000],[12,"Hàng lỗi",26749000],
+[1,"Khách từ chối nhận",22626500],[2,"Khách từ chối nhận",19187500],[3,"Khách từ chối nhận",14163000],[4,"Khách từ chối nhận",23752500],[5,"Khách từ chối nhận",13486000],[6,"Khách từ chối nhận",24615500],[7,"Khách từ chối nhận",24468500],[8,"Khách từ chối nhận",11339500],[9,"Khách từ chối nhận",16333500],[10,"Khách từ chối nhận",17582000],[11,"Khách từ chối nhận",13571000],[12,"Khách từ chối nhận",31372000],
+[1,"Hàng hết hạn",18407000],[2,"Hàng hết hạn",20554500],[3,"Hàng hết hạn",15702000],[4,"Hàng hết hạn",13560000],[5,"Hàng hết hạn",17104500],[6,"Hàng hết hạn",16950000],[7,"Hàng hết hạn",11313000],[8,"Hàng hết hạn",20439500],[9,"Hàng hết hạn",17105500],[10,"Hàng hết hạn",19268500],[11,"Hàng hết hạn",20878500],[12,"Hàng hết hạn",28985500],
+[1,"Hàng vỡ vận chuyển",10228500],[2,"Hàng vỡ vận chuyển",16451000],[3,"Hàng vỡ vận chuyển",13828500],[4,"Hàng vỡ vận chuyển",21802000],[5,"Hàng vỡ vận chuyển",18157000],[6,"Hàng vỡ vận chuyển",16768500],[7,"Hàng vỡ vận chuyển",15387000],[8,"Hàng vỡ vận chuyển",12757000],[9,"Hàng vỡ vận chuyển",19424000],[10,"Hàng vỡ vận chuyển",14753000],[11,"Hàng vỡ vận chuyển",20643500],[12,"Hàng vỡ vận chuyển",38667000],
+[1,"Không đúng đơn hàng",10771000],[2,"Không đúng đơn hàng",16692500],[3,"Không đúng đơn hàng",13840500],[4,"Không đúng đơn hàng",17782000],[5,"Không đúng đơn hàng",15977000],[6,"Không đúng đơn hàng",13385500],[7,"Không đúng đơn hàng",17189500],[8,"Không đúng đơn hàng",15627500],[9,"Không đúng đơn hàng",13271000],[10,"Không đúng đơn hàng",17020000],[11,"Không đúng đơn hàng",19115000],[12,"Không đúng đơn hàng",42776000],
+[1,"Sai sản phẩm",13403000],[2,"Sai sản phẩm",21389500],[3,"Sai sản phẩm",12395500],[4,"Sai sản phẩm",18600500],[5,"Sai sản phẩm",12953500],[6,"Sai sản phẩm",22406500],[7,"Sai sản phẩm",12655500],[8,"Sai sản phẩm",12150000],[9,"Sai sản phẩm",15834500],[10,"Sai sản phẩm",21519000],[11,"Sai sản phẩm",14774000],[12,"Sai sản phẩm",41915000]];
+// [id, actual, target] 2024 annual
+const EMP=[["EMP1002",1237148400,2258800000],["EMP1003",919027100,2861200000],["EMP1004",1432375800,2974000000],["EMP1005",1497689100,2728000000],["EMP1006",2327418700,2458800000],["EMP1007",2154664700,2432900000],["EMP1008",2108469900,2986000000],["EMP1009",1822547300,2405100000],["EMP1010",1726695900,2325100000],["EMP1011",1435678800,2912000000],["EMP1013",1430929900,2242000000],["EMP1014",2053345300,2742000000],["EMP1015",3120951800,3037100000],["EMP1016",1636108000,2840000000],["EMP1017",2179365300,2948000000],["EMP1018",1645928800,2525100000],["EMP1019",1342900600,3140000000],["EMP1020",899484400,2941200000],["EMP1021",1773252200,2772000000],["EMP1022",2492803200,2378000000],["EMP1024",812953300,2901200000],["EMP1025",1179848400,2672900000],["EMP1026",1327058400,2665100000],["EMP1027",1223650900,2845100000],["EMP1028",940197400,2742900000],["EMP1029",1245433300,2878000000],["EMP1030",3936457400,2828800000],["EMP1031",1911148200,3030000000],["EMP1032",1148922900,2751200000],["EMP1033",1506969400,3131200000],["EMP1034",239875500,1462000000],["EMP1035",1324439100,1333500000],["EMP1036",2963877700,2902900000],["EMP1037",2327413100,2692900000],["EMP1038",3743631200,3498000000],["EMP1039",5833778300,2618000000],["EMP1040",6042938800,3270000000],["EMP1041",12782219800,3181200000],["EMP1042",3959329400,3487100000],["EMP1043",230684300,1394400000],["EMP1044",5099251100,3530000000],["EMP1045",2163438600,2961200000],["EMP1046",1035393800,1707600000],["EMP1047",1512116400,2898000000],["EMP1048",761124800,1780000000],["EMP1049",2466795900,2931200000],["EMP1050",3492253400,2751200000],["EMP1051",1660292200,1503500000],["EMP1052",27067400,634200000],["EMP1053",1183112700,2512000000],["EMP1054",164439300,984400000],["EMP1055",995804600,2158000000],["EMP1056",619971100,2612000000],["EMP1057",2428440100,2647100000],["EMP1058",718105800,2217100000],["EMP1059",519989900,2516000000],["EMP1060",695437400,2050000000],["EMP1061",1129978700,2331200000],["EMP1062",436025800,2578800000],["EMP1063",759954400,2280000000],["EMP1064",943935300,2325100000],["EMP1065",2077044500,1878800000],["EMP1066",805349200,2136000000],["EMP1067",4302700,305800000],["EMP1068",603117300,2094000000],["EMP1069",965658700,2114900000],["EMP1070",612085700,1237000000],["EMP1071",740865900,1878800000],["EMP1072",464802000,2194900000],["EMP1073",456793800,2102000000],["EMP1074",522027800,2362900000],["EMP1075",190392000,1063500000],["EMP1076",607937500,1882000000],["EMP1077",539353000,2560000000],["EMP1078",426179600,2465100000],["EMP1079",10435254200,2558800000],["EMP1080",405443000,2185100000],["EMP1081",1193382400,2338000000],["EMP1082",17648200,769300000],["EMP1083",1412729000,2331200000],["EMP1084",327524600,2058800000],["EMP1085",763544700,2091200000],["EMP1086",661523300,1867100000],["EMP1087",831762700,2092000000],["EMP1088",480383000,2042900000],["EMP1089",695511800,2298800000],["EMP1090",720479700,2305100000],["EMP1091",455466000,2232000000],["EMP1092",872261600,2084000000],["EMP1093",687397200,1898800000],["EMP1094",1420387500,2640000000],["EMP1095",365245000,2122000000],["EMP1096",423248100,2248000000],["EMP1097",16960200,923600000],["EMP1098",321899700,2204000000],["EMP1099",551236300,2105100000],["EMP1100",119306000,1134000000],["EMP1101",874240100,2315200000],["EMP1102",476633800,2538800000],["EMP1103",961253600,1902000000],["EMP1104",184218700,2089500000],["EMP1105",310117600,2481200000],["EMP1106",1004500800,2428800000],["EMP1107",571758700,2322000000],["EMP1108",722965300,1877100000],["EMP1109",812579700,2131200000],["EMP1110",555577600,2302900000],["EMP1111",1558672700,2090000000]];
+// id -> [name, region, team]
+const EMPINFO={"EMP1001":["Hồ Thị Bình","Miền Bắc","Team Bắc 1"],"EMP1002":["Ngô Thị Hà","Miền Bắc","Team Bắc 1"],"EMP1003":["Phạm Bá Bình","Miền Bắc","Team Bắc 1"],"EMP1004":["Đỗ Minh An","Miền Bắc","Team Bắc 1"],"EMP1005":["Phạm Quốc Hùng","Miền Bắc","Team Bắc 1"],"EMP1006":["Đỗ Minh Cường","Miền Bắc","Team Bắc 1"],"EMP1007":["Bùi Minh Hải","Miền Bắc","Team Bắc 1"],"EMP1008":["Trần Thanh Hùng","Miền Bắc","Team Bắc 1"],"EMP1009":["Huỳnh Quốc Ngân","Miền Bắc","Team Bắc 1"],"EMP1010":["Đặng Xuân Thắng","Miền Bắc","Team Bắc 1"],"EMP1011":["Dương Quốc Lộc","Miền Bắc","Team Bắc 1"],"EMP1012":["Hồ Hữu Lộc","Miền Bắc","Team Bắc 2"],"EMP1013":["Phạm Hồng Tâm","Miền Bắc","Team Bắc 2"],"EMP1014":["Lê Bá Vân","Miền Bắc","Team Bắc 2"],"EMP1015":["Lê Thành Phương","Miền Bắc","Team Bắc 2"],"EMP1016":["Hoàng Bá An","Miền Bắc","Team Bắc 2"],"EMP1017":["Hoàng Xuân Long","Miền Bắc","Team Bắc 2"],"EMP1018":["Trần Thành Tuấn","Miền Bắc","Team Bắc 2"],"EMP1019":["Dương Bá An","Miền Bắc","Team Bắc 2"],"EMP1020":["Lý Minh Quân","Miền Bắc","Team Bắc 2"],"EMP1021":["Lý Thị Lan","Miền Bắc","Team Bắc 2"],"EMP1022":["Lý Công Phương","Miền Bắc","Team Bắc 2"],"EMP1023":["Hồ Thành Hải","Miền Bắc","Team Bắc 3"],"EMP1024":["Phạm Thanh Giang","Miền Bắc","Team Bắc 3"],"EMP1025":["Trần Hồng Dũng","Miền Bắc","Team Bắc 3"],"EMP1026":["Bùi Thanh Thắng","Miền Bắc","Team Bắc 3"],"EMP1027":["Dương Hữu Nhân","Miền Bắc","Team Bắc 3"],"EMP1028":["Vũ Xuân Thảo","Miền Bắc","Team Bắc 3"],"EMP1029":["Dương Thị Quân","Miền Bắc","Team Bắc 3"],"EMP1030":["Lê Minh Thảo","Miền Bắc","Team Bắc 3"],"EMP1031":["Hồ Bá An","Miền Bắc","Team Bắc 3"],"EMP1032":["Đặng Thanh Lộc","Miền Bắc","Team Bắc 3"],"EMP1033":["Hoàng Hữu Tiến","Miền Bắc","Team Bắc 3"],"EMP1034":["Hoàng Thanh Dũng","Miền Trung","Team Trung 1"],"EMP1035":["Đỗ Hữu Long","Miền Trung","Team Trung 1"],"EMP1036":["Đỗ Thị Quân","Miền Trung","Team Trung 1"],"EMP1037":["Trần Xuân Uyên","Miền Trung","Team Trung 1"],"EMP1038":["Vũ Đức Tuấn","Miền Trung","Team Trung 1"],"EMP1039":["Đỗ Công Hùng","Miền Trung","Team Trung 1"],"EMP1040":["Huỳnh Thị Quân","Miền Trung","Team Trung 1"],"EMP1041":["Ngô Minh An","Miền Trung","Team Trung 1"],"EMP1042":["Trần Hồng Linh","Miền Trung","Team Trung 1"],"EMP1043":["Hồ Thành Tâm","Miền Trung","Team Trung 2"],"EMP1044":["Hồ Xuân Thắng","Miền Trung","Team Trung 2"],"EMP1045":["Hoàng Đức Sơn","Miền Trung","Team Trung 2"],"EMP1046":["Ngô Đức Cường","Miền Trung","Team Trung 2"],"EMP1047":["Nguyễn Minh Hải","Miền Trung","Team Trung 2"],"EMP1048":["Trần Quốc Nhân","Miền Trung","Team Trung 2"],"EMP1049":["Nguyễn Đức Việt","Miền Trung","Team Trung 2"],"EMP1050":["Vũ Văn Trung","Miền Trung","Team Trung 2"],"EMP1051":["Lý Thanh Phúc","Miền Trung","Team Trung 2"],"EMP1052":["Lý Thị Thắng","Miền Nam","Team Nam 1"],"EMP1053":["Hồ Bá Việt","Miền Nam","Team Nam 1"],"EMP1054":["Hoàng Văn Hùng","Miền Nam","Team Nam 1"],"EMP1055":["Bùi Thị Kiên","Miền Nam","Team Nam 1"],"EMP1056":["Bùi Bá Nam","Miền Nam","Team Nam 1"],"EMP1057":["Huỳnh Thành Khoa","Miền Nam","Team Nam 1"],"EMP1058":["Vũ Hồng Tiến","Miền Nam","Team Nam 1"],"EMP1059":["Đỗ Công Tuấn","Miền Nam","Team Nam 1"],"EMP1060":["Phạm Xuân Uyên","Miền Nam","Team Nam 1"],"EMP1061":["Đặng Hồng Long","Miền Nam","Team Nam 1"],"EMP1062":["Lý Thanh Tuấn","Miền Nam","Team Nam 1"],"EMP1063":["Phạm Hữu Giang","Miền Nam","Team Nam 1"],"EMP1064":["Vũ Thanh Linh","Miền Nam","Team Nam 1"],"EMP1065":["Dương Hồng Thảo","Miền Nam","Team Nam 1"],"EMP1066":["Lê Hữu Uyên","Miền Nam","Team Nam 1"],"EMP1067":["Đặng Đức Trung","Miền Nam","Team Nam 2"],"EMP1068":["Hoàng Bá Vân","Miền Nam","Team Nam 2"],"EMP1069":["Phạm Minh Việt","Miền Nam","Team Nam 2"],"EMP1070":["Phạm Xuân Linh","Miền Nam","Team Nam 2"],"EMP1071":["Bùi Hữu Nhân","Miền Nam","Team Nam 2"],"EMP1072":["Ngô Văn Kiên","Miền Nam","Team Nam 2"],"EMP1073":["Lý Xuân Phúc","Miền Nam","Team Nam 2"],"EMP1074":["Nguyễn Xuân Việt","Miền Nam","Team Nam 2"],"EMP1075":["Bùi Văn Lộc","Miền Nam","Team Nam 2"],"EMP1076":["Lê Văn Tâm","Miền Nam","Team Nam 2"],"EMP1077":["Huỳnh Xuân Thắng","Miền Nam","Team Nam 2"],"EMP1078":["Ngô Bá Dũng","Miền Nam","Team Nam 2"],"EMP1079":["Phạm Thanh Bình","Miền Nam","Team Nam 2"],"EMP1080":["Trần Công Ngân","Miền Nam","Team Nam 2"],"EMP1081":["Đỗ Hồng Khoa","Miền Nam","Team Nam 2"],"EMP1082":["Đỗ Thành Kiên","Miền Nam","Team Nam 3"],"EMP1083":["Ngô Thành Quân","Miền Nam","Team Nam 3"],"EMP1084":["Bùi Xuân Hải","Miền Nam","Team Nam 3"],"EMP1085":["Lý Hữu Hùng","Miền Nam","Team Nam 3"],"EMP1086":["Lê Hồng Thắng","Miền Nam","Team Nam 3"],"EMP1087":["Lý Thanh Hà","Miền Nam","Team Nam 3"],"EMP1088":["Đỗ Thành Kiên","Miền Nam","Team Nam 3"],"EMP1089":["Đặng Thanh Yến","Miền Nam","Team Nam 3"],"EMP1090":["Nguyễn Bá Nam","Miền Nam","Team Nam 3"],"EMP1091":["Dương Thanh Trung","Miền Nam","Team Nam 3"],"EMP1092":["Phạm Xuân Quân","Miền Nam","Team Nam 3"],"EMP1093":["Bùi Quốc Phương","Miền Nam","Team Nam 3"],"EMP1094":["Hoàng Thanh Khoa","Miền Nam","Team Nam 3"],"EMP1095":["Phạm Hồng Trung","Miền Nam","Team Nam 3"],"EMP1096":["Lý Thanh Tiến","Miền Nam","Team Nam 3"],"EMP1097":["Ngô Bá Lan","Miền Nam","Team Nam 4"],"EMP1098":["Hoàng Hồng Lan","Miền Nam","Team Nam 4"],"EMP1099":["Đặng Hữu Việt","Miền Nam","Team Nam 4"],"EMP1100":["Lý Thị Lộc","Miền Nam","Team Nam 4"],"EMP1101":["Dương Công Tuấn","Miền Nam","Team Nam 4"],"EMP1102":["Đỗ Công Phúc","Miền Nam","Team Nam 4"],"EMP1103":["Vũ Minh Dũng","Miền Nam","Team Nam 4"],"EMP1104":["Trần Đức Quân","Miền Nam","Team Nam 4"],"EMP1105":["Vũ Hữu Trung","Miền Nam","Team Nam 4"],"EMP1106":["Ngô Hữu Giang","Miền Nam","Team Nam 4"],"EMP1107":["Bùi Thanh Linh","Miền Nam","Team Nam 4"],"EMP1108":["Dương Minh Tiến","Miền Nam","Team Nam 4"],"EMP1109":["Hoàng Bá Vân","Miền Nam","Team Nam 4"],"EMP1110":["Đỗ Minh Bình","Miền Nam","Team Nam 4"],"EMP1111":["Nguyễn Đức Trung","Miền Nam","Team Nam 4"]};
+// DIST rows injected below (name,tier,channel,orders,gross,delivered,fill)
+const DIST=[];
+const KPI={sales:158957563200,orders:50000,qty:7455076,customers:1802,returns:1308971000};
+
+const COLORS=['#4C72B0','#DD8452','#55A868','#C44E52','#8172B3','#937860'];
+const MLAB=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmtB=v=>{const a=Math.abs(v);if(a>=1e9)return (v/1e9).toFixed(2)+' tỷ';if(a>=1e6)return (v/1e6).toFixed(1)+' tr';return v.toLocaleString()};
+const fmtN=v=>v.toLocaleString('en-US');
+const pctCls=p=>p>=100?'pct-good':p>=80?'pct-mid':'pct-bad';
+
+const app={
+  charts:{},
+  tab(i,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('p'+i).classList.add('active')},
+  fRegion:()=>{const v=document.getElementById('fRegion').value;return v==='all'?null:v},
+  fChannel:()=>{const v=document.getElementById('fChannel').value;return v==='all'?null:v},
+  filtered(){const r=this.fRegion(),c=this.fChannel();return MONTHLY.filter(d=>(!r||d[1]===r)&&(!c||d[2]===c))},
+  refresh(){
+    const f=this.filtered();
+    const sales=f.reduce((s,d)=>s+d[3],0),orders=f.reduce((s,d)=>s+d[4],0),qty=f.reduce((s,d)=>s+d[5],0);
+    document.getElementById('k_sales').textContent=fmtB(sales)+' ₫';
+    document.getElementById('k_sales_s').textContent=(this.fRegion()||'All regions')+' · '+(this.fChannel()||'all channels');
+    document.getElementById('k_orders').textContent=fmtN(orders);
+    document.getElementById('k_orders_s').textContent='avg '+fmtB(sales/Math.max(orders,1))+' ₫/order';
+    document.getElementById('k_qty').textContent=fmtN(qty);
+    document.getElementById('k_ret').textContent=(100*KPI.returns/KPI.sales).toFixed(2)+'%';
+    // trend
+    const bym=Array(12).fill(0);f.forEach(d=>bym[d[0]-1]+=d[3]);
+    this.upd('cTrend',{type:'line',data:{labels:MLAB,datasets:[{label:'Sales',data:bym,borderColor:COLORS[0],backgroundColor:COLORS[0]+'22',fill:true,tension:.3,borderWidth:2}]},options:this.opt('₫')});
+    // channel donut
+    const ch={};f.forEach(d=>ch[d[2]]=(ch[d[2]]||0)+d[3]);
+    this.upd('cChannel',{type:'doughnut',data:{labels:Object.keys(ch),datasets:[{data:Object.values(ch),backgroundColor:COLORS,borderColor:'#fff',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmtB(c.parsed)} ₫`}}}}});
+    // region bar
+    const rg={};f.forEach(d=>rg[d[1]]=(rg[d[1]]||0)+d[3]);
+    this.upd('cRegion',{type:'bar',data:{labels:Object.keys(rg),datasets:[{data:Object.values(rg),backgroundColor:COLORS.map(c=>c+'CC'),borderRadius:4}]},options:this.opt('₫',true)});
+    this.renderEmp();this.renderDist();
+  },
+  opt(unit,noLegend){return{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:!noLegend,position:'top'},tooltip:{callbacks:{label:c=>` ${c.dataset.label||''}: ${fmtB(c.parsed.y??c.parsed.x)} ${unit}`}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>fmtB(v)}},x:{grid:{display:false}}}}},
+  upd(id,cfg){if(this.charts[id]){this.charts[id].destroy()}this.charts[id]=new Chart(document.getElementById(id).getContext('2d'),cfg)},
+  staticCharts(){
+    // returns by reason
+    const rr={};RET.forEach(d=>rr[d[1]]=(rr[d[1]]||0)+d[2]);
+    this.upd('cReturns',{type:'bar',data:{labels:Object.keys(rr),datasets:[{data:Object.values(rr),backgroundColor:COLORS[3]+'CC',borderRadius:4}]},options:{...this.opt('₫',true),indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{callback:v=>fmtB(v)}},y:{grid:{display:false}}}}});
+    // top products
+    const tp=[...PROD].sort((a,b)=>b[2]-a[2]).slice(0,10);
+    this.upd('cProducts',{type:'bar',data:{labels:tp.map(p=>p[0]),datasets:[{data:tp.map(p=>p[2]),backgroundColor:COLORS[0]+'CC',borderRadius:4}]},options:{...this.opt('₫',true),indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{callback:v=>fmtB(v)}},y:{grid:{display:false}}}}});
+    // actual vs target
+    this.upd('cAvT',{type:'bar',data:{labels:MLAB,datasets:[{label:'Actual',data:TGT.map(t=>t[1]),backgroundColor:COLORS[0]+'CC',borderRadius:4},{label:'Target',data:TGT.map(t=>t[2]),backgroundColor:'#ced4da',borderRadius:4}]},options:this.opt('₫')});
+    // page-2 KPIs
+    const act=TGT.reduce((s,t)=>s+t[1],0),tgt=TGT.reduce((s,t)=>s+t[2],0);
+    document.getElementById('k_act').textContent=fmtB(act)+' ₫';
+    document.getElementById('k_tgt').textContent=fmtB(tgt)+' ₫';
+    document.getElementById('k_var').textContent=fmtB(act-tgt)+' ₫';
+    document.getElementById('k_ach').textContent=(100*act/tgt).toFixed(1)+'%';
+    document.getElementById('k_ach_s').textContent='targets exceed actuals across all months';
+    // distributors
+    const td=[...DIST].sort((a,b)=>b[5]-a[5]).slice(0,15);
+    this.upd('cDist',{type:'bar',data:{labels:td.map(d=>d[0].replace('Công ty ','')),datasets:[{data:td.map(d=>d[5]),backgroundColor:COLORS[2]+'CC',borderRadius:4}]},options:{...this.opt('₫',true),indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{callback:v=>fmtB(v)}},y:{grid:{display:false},ticks:{font:{size:10}}}}}});
+    document.getElementById('k_dist').textContent=DIST.length;
+    document.getElementById('k_dorders').textContent=fmtN(DIST.reduce((s,d)=>s+d[3],0));
+    document.getElementById('k_deliv').textContent=fmtB(DIST.reduce((s,d)=>s+d[5],0))+' ₫';
+    document.getElementById('k_fill').textContent=(DIST.reduce((s,d)=>s+d[6],0)/DIST.length).toFixed(1)+'%';
+  },
+  empSort:['ach',1],
+  renderEmp(){
+    const r=this.fRegion(),team=document.getElementById('fTeam').value,q=(document.getElementById('fEmp').value||'').toLowerCase();
+    let rows=EMP.map(e=>{const i=EMPINFO[e[0]]||['?','?','?'];return{id:e[0],name:i[0],region:i[1],team:i[2],act:e[1],tgt:e[2],ach:100*e[1]/e[2]}})
+      .filter(e=>(!r||e.region===r)&&(team==='all'||e.team===team)&&(!q||e.name.toLowerCase().includes(q)||e.id.toLowerCase().includes(q)));
+    const[k,dir]=this.empSort;rows.sort((a,b)=>(a[k]<b[k]?1:-1)*dir);
+    const arrow=c=>this.empSort[0]===c?(this.empSort[1]===1?' ▼':' ▲'):'';
+    let h=`<thead><tr><th onclick="app.sortEmp('id')">ID${arrow('id')}</th><th onclick="app.sortEmp('name')">Name${arrow('name')}</th><th onclick="app.sortEmp('region')">Region${arrow('region')}</th><th onclick="app.sortEmp('team')">Team${arrow('team')}</th><th class="num" onclick="app.sortEmp('act')">Actual${arrow('act')}</th><th class="num" onclick="app.sortEmp('tgt')">Target${arrow('tgt')}</th><th class="num" onclick="app.sortEmp('ach')">Achievement${arrow('ach')}</th></tr></thead><tbody>`;
+    rows.forEach(e=>{h+=`<tr><td>${e.id}</td><td>${e.name}</td><td>${e.region}</td><td>${e.team}</td><td class="num">${fmtB(e.act)}</td><td class="num">${fmtB(e.tgt)}</td><td class="num"><span class="bar" style="width:${Math.min(e.ach,150)/1.5}px"></span><span class="${pctCls(e.ach)}">${e.ach.toFixed(1)}%</span></td></tr>`});
+    document.getElementById('tEmp').innerHTML=h+'</tbody>';
+  },
+  sortEmp(k){this.empSort=this.empSort[0]===k?[k,-this.empSort[1]]:[k,1];this.renderEmp()},
+  distSort:['delivered',1],
+  renderDist(){
+    const c=this.fChannel(),tier=document.getElementById('fTier').value,q=(document.getElementById('fDist').value||'').toLowerCase();
+    let rows=DIST.map(d=>({name:d[0],tier:d[1],channel:d[2],orders:d[3],gross:d[4],delivered:d[5],fill:d[6]}))
+      .filter(d=>(!c||d.channel===c)&&(tier==='all'||d.tier===tier)&&(!q||d.name.toLowerCase().includes(q)));
+    const[k,dir]=this.distSort;rows.sort((a,b)=>(a[k]<b[k]?1:-1)*dir);
+    const arrow=cc=>this.distSort[0]===cc?(this.distSort[1]===1?' ▼':' ▲'):'';
+    let h=`<thead><tr><th onclick="app.sortDist('name')">Distributor${arrow('name')}</th><th onclick="app.sortDist('tier')">Tier${arrow('tier')}</th><th onclick="app.sortDist('channel')">Channel${arrow('channel')}</th><th class="num" onclick="app.sortDist('orders')">Orders${arrow('orders')}</th><th class="num" onclick="app.sortDist('gross')">Gross${arrow('gross')}</th><th class="num" onclick="app.sortDist('delivered')">Delivered${arrow('delivered')}</th><th class="num" onclick="app.sortDist('fill')">Fill Rate${arrow('fill')}</th></tr></thead><tbody>`;
+    rows.forEach(d=>{h+=`<tr><td>${d.name}</td><td>${d.tier}</td><td>${d.channel}</td><td class="num">${d.orders}</td><td class="num">${fmtB(d.gross)}</td><td class="num">${fmtB(d.delivered)}</td><td class="num ${d.fill>=85?'pct-good':d.fill>=83?'pct-mid':'pct-bad'}">${d.fill.toFixed(1)}%</td></tr>`});
+    document.getElementById('tDist').innerHTML=h+'</tbody>';
+  },
+  sortDist(k){this.distSort=this.distSort[0]===k?[k,-this.distSort[1]]:[k,1];this.renderDist()},
+  init(){
+    [...new Set(MONTHLY.map(d=>d[1]))].forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;document.getElementById('fRegion').appendChild(o)});
+    [...new Set(MONTHLY.map(d=>d[2]))].forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;document.getElementById('fChannel').appendChild(o)});
+    [...new Set(Object.values(EMPINFO).map(i=>i[2]))].sort().forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;document.getElementById('fTeam').appendChild(o)});
+    [...new Set(DIST.map(d=>d[1]))].forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;document.getElementById('fTier').appendChild(o)});
+    this.staticCharts();this.refresh();
+  }
+};
+window.addEventListener('DOMContentLoaded',()=>app.init());
+</script>
+</body>
+</html>
