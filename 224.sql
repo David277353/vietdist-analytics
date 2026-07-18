@@ -1,1 +1,0 @@
-   CREATE DATABASE vietdist_dw;
